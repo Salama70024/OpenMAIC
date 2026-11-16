@@ -93,6 +93,6 @@ e2e/__screenshots-619/
 
 # Temporary render-service sources extracted by the mixed-pool regression test
 render-service/.owner-bound-parent-*/
-
-# Generated from pinned pdfjs-dist during dev/build.
+# Generated from the pinned pdfjs-dist package during dev/build.
 /public/school/pdf.worker.min.mjs
+/public/school/grade-4-science.base64.txt

@@ -11,7 +11,7 @@ import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
 import './school.css';
 
-const BOOK_URL = '/books/grade-4-science.pdf';
+const BOOK_DATA_URL = '/school/grade-4-science.base64.txt';
 const START_PAGE = 73;
 
 type ChatEntry = { from: 'teacher' | 'assistant'; text: string };
@@ -47,6 +47,7 @@ export default function SchoolPage() {
   const [activePoint, setActivePoint] = useState<LessonPoint | null>(null);
   const [markersVisible, setMarkersVisible] = useState(true);
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const [readerExpanded, setReaderExpanded] = useState(false);
   const [sound, setSound] = useState(false);
   const [listening, setListening] = useState(false);
   const [question, setQuestion] = useState('');
@@ -67,10 +68,19 @@ export default function SchoolPage() {
       try {
         const pdfjs = await import('pdfjs-dist');
         pdfjs.GlobalWorkerOptions.workerSrc = '/school/pdf.worker.min.mjs';
-        pdfDoc = await pdfjs.getDocument({ url: BOOK_URL }).promise;
+        // Fetch text rather than a .pdf URL so browser download managers do not
+        // hijack PDF.js. Decoding preserves every byte, glyph and page image.
+        const response = await fetch(BOOK_DATA_URL);
+        if (!response.ok) throw new Error(`Book asset request failed: ${response.status}`);
+        const encoded = await response.text();
+        const binary = atob(encoded.trim());
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
         if (active) setPdf(pdfDoc);
-      } catch {
-        if (active) setLoadError('تعذر تحميل الكتاب. تأكد من وجود ملف العلوم الرسمي في مجلد public/books.');
+      } catch (error) {
+        console.error('Failed to open the embedded science textbook:', error);
+        if (active) setLoadError('تعذر فتح النسخة المدمجة من الكتاب. يرجى إعادة تشغيل خادم التطوير.');
       }
     }
     void openBook();
@@ -226,7 +236,7 @@ export default function SchoolPage() {
         </div>
       </section>
 
-      <section className={`school-workspace ${assistantOpen ? '' : 'school-chat-hidden'}`}>
+      <section className={`school-workspace ${assistantOpen ? '' : 'school-chat-hidden'} ${readerExpanded ? 'school-reading-mode' : ''}`}>
         <aside className="school-chapters">
           <div className="school-side-heading"><BookOpen size={18} /><strong>فهرس الدرس</strong></div>
           {bookPages.map((item) => (
@@ -248,7 +258,7 @@ export default function SchoolPage() {
             <div className="school-reader-title"><BookOpen size={19} /><strong>الكتاب المدرسي الرسمي</strong><span className="school-reader-subtitle">نسخة تفاعلية</span></div>
             <div className="school-reader-controls">
               <button onClick={() => setMarkersVisible((prev) => !prev)} className={markersVisible ? 'school-control-on' : ''}><Sparkles size={16} /> نقاط الشرح</button>
-              <a href={BOOK_URL} target="_blank" rel="noreferrer" title="فتح الكتاب الأصلي في تبويب جديد"><Maximize2 size={16} /></a>
+              <button type="button" onClick={() => setReaderExpanded((value) => !value)} title={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'} aria-label={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'}><Maximize2 size={16} /></button>
             </div>
           </div>
           <div className="school-reader-scroll" ref={viewerRef}>

@@ -100,6 +100,11 @@
 .school-chat-form .school-mic-active { color:#df464c; background:#fff0f0; }
 .school-chat-form small { display:flex; gap:6px; align-items:center; justify-content:center; color:#98a3b6; font-size:10px; margin-top:9px; }
 .school-workspace.school-chat-hidden { grid-template-columns:250px minmax(350px,1fr) auto; }
+.school-workspace.school-reading-mode { grid-template-columns:minmax(0,1fr); max-width:1540px; }
+.school-workspace.school-reading-mode .school-chapters,
+.school-workspace.school-reading-mode .school-assistant,
+.school-workspace.school-reading-mode .school-open-chat { display:none; }
+.school-workspace.school-reading-mode .school-reader-scroll { max-height:calc(100vh - 220px); }
 .school-open-chat { border:none; background:#6265d9; color:white; border-radius:13px; padding:13px; display:flex; align-items:center; gap:7px; box-shadow:0 5px 15px #6265d947; white-space:nowrap; }
 .school-footer { text-align:center; padding:0 14px 24px; color:#a6b0c6; font-size:11px; }
 @media (max-width: 1250px) { .school-workspace { grid-template-columns:220px minmax(300px,1fr) 310px; padding:14px; gap:10px; } .school-intro{padding:18px 14px;} }
