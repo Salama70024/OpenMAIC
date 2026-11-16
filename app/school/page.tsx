@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, GraduationCap,
-  HelpCircle, Lightbulb, LoaderCircle, Maximize2, MessageCircle, Mic, MicOff,
-  Play, Send, Sparkles, Volume2, VolumeX, X, ZoomIn, ZoomOut,
+  HelpCircle, Lightbulb, LoaderCircle, Maximize2, Mic, MicOff,
+  PanelRightClose, PanelRightOpen, Play, Send, Sparkles, Volume2, VolumeX, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
-import { guidedIntroductions, guidedStages } from '@/lib/school/learning-content';
+import { guidedStages } from '@/lib/school/learning-content';
 import { StageIllustration } from './StageIllustration';
+import '@fontsource/noto-sans-arabic/arabic-400.css';
+import '@fontsource/noto-sans-arabic/arabic-700.css';
 import './school.css';
 
 const BOOK_DATA_URL = '/school/grade-4-science.base64.txt';
@@ -49,10 +52,13 @@ export default function SchoolPage() {
   const [zoomPercent, setZoomPercent] = useState(100);
   const [canvasSize, setCanvasSize] = useState({ width: 700, height: 990 });
   const [rendering, setRendering] = useState(true);
-  const [activePoint, setActivePoint] = useState<LessonPoint | null>(null);
+  const [activePoint, setActivePoint] = useState<LessonPoint | null>(
+    lessonPoints.find((point) => point.page === START_PAGE && point.number === 1) ?? null,
+  );
   const [markersVisible, setMarkersVisible] = useState(true);
+  const [chaptersOpen, setChaptersOpen] = useState(true);
   const [assistantOpen, setAssistantOpen] = useState(true);
-  const [sideTab, setSideTab] = useState<'lesson' | 'assistant'>('lesson');
+  const [sideTab, setSideTab] = useState<'lesson' | 'activity' | 'assistant'>('lesson');
   const [quizChoice, setQuizChoice] = useState<number | null>(null);
   const [readerExpanded, setReaderExpanded] = useState(false);
   const [sound, setSound] = useState(false);
@@ -169,6 +175,7 @@ export default function SchoolPage() {
   const jump = useCallback((target: number) => {
     setPage(Math.max(1, Math.min(pdf?.numPages || 216, target)));
     setActivePoint(null);
+    setQuizChoice(null);
     setLoadError('');
   }, [pdf]);
 
@@ -245,34 +252,36 @@ export default function SchoolPage() {
   const hotspots = lessonPoints.filter((point) => point.page === page);
   const currentGroup = page >= 78 ? 'frog' : 'butterfly';
   const stages = lessonPoints.filter((point) => point.group === currentGroup);
-  const lessonIntroduction = guidedIntroductions[currentGroup];
-  const guidedPoint = activePoint ? guidedStages[activePoint.id] : null;
+  const pointForLesson = activePoint?.group === currentGroup ? activePoint : (stages.find((point) => point.page === page) ?? stages[0]);
+  const stageContent = pointForLesson ? guidedStages[pointForLesson.id] : null;
+  const quizContent = stageContent && pointForLesson ? (
+    <div className="school-guided-quiz">
+      <h4><Check size={15} /> تحقّق من فهمك</h4>
+      <p>{stageContent.question}</p>
+      {stageContent.choices.map((choice, index) => (
+        <button type="button" key={choice}
+          className={`${quizChoice === index ? 'chosen' : ''} ${quizChoice === index && index === stageContent.correctChoice ? 'correct' : ''}`}
+          onClick={() => setQuizChoice(index)}>{choice}</button>
+      ))}
+      {quizChoice !== null && <div className={`school-quiz-feedback ${quizChoice === stageContent.correctChoice ? 'correct' : 'retry'}`} role="status">
+        {quizChoice === stageContent.correctChoice ? stageContent.feedback : 'قريب من الإجابة! تأمّل الشرح والصورة، ثم جرّب مرة أخرى.'}
+      </div>}
+    </div>
+  ) : null;
 
   return (
     <main className="school-app" dir="rtl">
       <header className="school-header">
         <div className="school-brand">
-          <span className="school-brand-icon"><GraduationCap size={27} /></span>
+          <span className="school-brand-icon"><GraduationCap size={24} /></span>
           <div><strong>مدرسة الفردوس الافتراضية</strong><small>العلم يصبح تجربةً نعيشها</small></div>
         </div>
-        <div className="school-crumbs"><span>الابتدائية</span><ChevronLeft size={16} /><span>الرابع الابتدائي</span><ChevronLeft size={16} /><strong>العلوم</strong></div>
-        <Link href="/" className="school-home"><ArrowLeft size={17} /> OpenMAIC</Link>
+        <div className="school-lesson-heading"><strong>دورات حياة الحيوانات</strong><small>علوم • الرابع الابتدائي</small></div>
+        <Link href="/" className="school-home"><ArrowLeft size={17} /> جميع الدروس</Link>
       </header>
 
-      <section className="school-intro">
-        <div>
-          <span className="school-eyebrow"><Sparkles size={15} /> الدرس التفاعلي الأول</span>
-          <h1>دورات حياة الحيوانات <span>🦋</span></h1>
-          <p>الكتاب الوزاري الأصلي أمامك، ومعه شرح مصوّر وأنشطة أعددناها للدرس. اضغط على المراحل لتتعلم بنفسك، واستعن بالمعلم الذكي عند الحاجة.</p>
-        </div>
-        <div className="school-intro-actions">
-          <button className="school-start" onClick={() => { setSound(true); say('مرحباً بكم يا أبطال في مدرسة الفردوس الابتدائية. اليوم سنكتشف معاً أسرار دورة حياة الحيوانات. هيا نبدأ!'); }}><Play size={18} fill="currentColor" /> تشغيل الترحيب الصوتي</button>
-          <button className="school-pill" onClick={() => { setSound((prev) => !prev); window.speechSynthesis?.cancel(); }} title="تشغيل أو كتم صوت الشرح">{sound ? <Volume2 size={19} /> : <VolumeX size={19} />}{sound ? 'الصوت يعمل' : 'الصوت متوقف'}</button>
-        </div>
-      </section>
-
-      <section className={`school-workspace ${assistantOpen ? '' : 'school-chat-hidden'} ${readerExpanded ? 'school-reading-mode' : ''}`}>
-        <aside className="school-chapters">
+      <section className={`school-workspace ${assistantOpen ? '' : 'school-chat-hidden'} ${chaptersOpen ? '' : 'school-index-hidden'} ${readerExpanded ? 'school-reading-mode' : ''}`}>
+        {chaptersOpen && <aside className="school-chapters">
           <div className="school-side-heading"><BookOpen size={18} /><strong>فهرس الدرس</strong></div>
           {bookPages.map((item) => (
             <button key={item.page} className={`school-chapter ${page === item.page ? 'active' : ''}`} onClick={() => jump(item.page)}>
@@ -280,18 +289,20 @@ export default function SchoolPage() {
             </button>
           ))}
           <div className="school-chapter-note"><Lightbulb size={18} /><p>الصفحات المعروضة من كتاب <b>العلوم للرابع الابتدائي</b> كما وردت في النسخة الأصلية، دون تعديل.</p></div>
-          <div className="school-side-heading school-points-heading"><Sparkles size={18} /><strong>نقاط تفاعلية</strong></div>
-          {lessonPoints.filter((point) => point.group === (page >= 78 ? 'frog' : 'butterfly')).map((point) => (
-            <button className={`school-point-link ${activePoint?.id === point.id ? 'active' : ''}`} key={point.id} onClick={() => { if (point.page !== page) jump(point.page); choosePoint(point); }}>
-              <span>{point.number}</span>{point.title}{point.page !== page && <ChevronLeft size={14} />}
-            </button>
-          ))}
-        </aside>
+          <button type="button" className="school-hide-index" onClick={() => setChaptersOpen(false)}><PanelRightClose size={15} /> إخفاء الفهرس لتوسيع الكتاب</button>
+        </aside>}
 
-        <section className="school-reader">
+        <section className="school-reader" aria-label="الكتاب الوزاري الأصلي">
           <div className="school-reader-top">
-            <div className="school-reader-title"><BookOpen size={19} /><strong>الكتاب المدرسي الرسمي</strong><span className="school-reader-subtitle">نسخة تفاعلية</span></div>
+            <div className="school-reader-modes" aria-label="طريقة التعلم">
+              <span className="school-reader-mode-active"><BookOpen size={15} /> الكتاب</span>
+              <span className="school-reader-mode-future" title="سنضيف المحاكاة عندما تكتمل المادة التعليمية">المحاكاة <small>لاحقاً</small></span>
+            </div>
             <div className="school-reader-controls">
+              <button type="button" onClick={() => setChaptersOpen((prev) => !prev)}
+                title={chaptersOpen ? 'إخفاء الفهرس' : 'إظهار الفهرس'} aria-label={chaptersOpen ? 'إخفاء الفهرس' : 'إظهار الفهرس'}>
+                {chaptersOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+              </button>
               <button onClick={() => setMarkersVisible((prev) => !prev)} className={markersVisible ? 'school-control-on' : ''}><Sparkles size={16} /> نقاط الشرح</button>
               <button type="button" onClick={() => changeZoom(0.8)} title="تصغير الصفحة" aria-label="تصغير الصفحة"><ZoomOut size={16} /></button>
               <span className="school-zoom-label" dir="ltr">{zoomPercent}%</span>
@@ -324,35 +335,55 @@ export default function SchoolPage() {
         </section>
 
         {assistantOpen && <aside className="school-assistant">
-          <div className="school-assistant-head"><span className="school-ai-avatar"><BookOpen size={22} /></span><div><strong>رحلة التعلّم</strong><small>شرح ورسومات وأنشطة داخل الدرس</small></div><button onClick={() => setAssistantOpen(false)} title="إغلاق لوحة التعلم" aria-label="إغلاق لوحة التعلم"><X size={18} /></button></div>
+          <div className="school-assistant-head"><BookOpen size={20} /><div><strong>تعلّم خطوة بخطوة</strong><small>شرح وأنشطة مرتبطة بالكتاب</small></div><button onClick={() => setAssistantOpen(false)} title="إخفاء لوحة التعلّم" aria-label="إخفاء لوحة التعلّم"><X size={18} /></button></div>
           <div className="school-panel-tabs" role="tablist" aria-label="محتوى التعلم والمساعد">
-            <button type="button" role="tab" aria-selected={sideTab === 'lesson'} className={sideTab === 'lesson' ? 'active' : ''} onClick={() => setSideTab('lesson')}><BookOpen size={15} /> الدرس المصوّر</button>
-            <button type="button" role="tab" aria-selected={sideTab === 'assistant'} className={sideTab === 'assistant' ? 'active' : ''} onClick={() => setSideTab('assistant')}><MessageCircle size={15} /> اسأل المعلم (اختياري)</button>
+            <button type="button" role="tab" aria-selected={sideTab === 'lesson'} className={sideTab === 'lesson' ? 'active' : ''} onClick={() => setSideTab('lesson')}>الشرح</button>
+            <button type="button" role="tab" aria-selected={sideTab === 'activity'} className={sideTab === 'activity' ? 'active' : ''} onClick={() => setSideTab('activity')}>نشاط</button>
+            <button type="button" role="tab" aria-selected={sideTab === 'assistant'} className={sideTab === 'assistant' ? 'active' : ''} onClick={() => setSideTab('assistant')}>اسأل</button>
           </div>
           {sideTab === 'lesson' ? <div className="school-guided-content" role="tabpanel">
-            <span className="school-guided-label">محتوى تعليمي مُعدّ مسبقاً</span>
-            <h2>{lessonIntroduction.title}</h2>
-            <p className="school-guided-intro">{lessonIntroduction.intro}</p>
-            <div className="school-cycle-grid" aria-label={`مخطط ${lessonIntroduction.title}`}>
-              {stages.map((point) => <button type="button" key={point.id} className={`school-cycle-stage ${activePoint?.id === point.id ? 'active' : ''}`} onClick={() => { if (page !== point.page) jump(point.page); choosePoint(point); }} aria-pressed={activePoint?.id === point.id}>
-                <StageIllustration point={point} />
-                <span className="school-cycle-step"><b>{point.number}</b>{point.title}</span>
-              </button>)}
-            </div>
-            {activePoint?.group === currentGroup && guidedPoint ? <div className="school-guided-stage">
-              <div className="school-guided-stage-heading"><span>{activePoint.number}</span><h3>{activePoint.title}</h3></div>
-              <p>{guidedPoint.explanation}</p>
-              <div className="school-guided-observe"><Lightbulb size={17} /><p><strong>لاحظ في الكتاب:</strong> {guidedPoint.lookFor}</p></div>
-              <div className="school-guided-why"><strong>لماذا هذه المرحلة مهمة؟</strong><p>{guidedPoint.why}</p></div>
-              <div className="school-guided-quiz">
-                <h4>اختبر فهمك <span>✓</span></h4>
-                <p>{guidedPoint.question}</p>
-                {guidedPoint.choices.map((choice, index) => <button type="button" key={choice} className={`${quizChoice === index ? 'chosen' : ''} ${quizChoice === index && index === guidedPoint.correctChoice ? 'correct' : ''}`} onClick={() => setQuizChoice(index)}>{choice}</button>)}
-                {quizChoice !== null && <div className={`school-quiz-feedback ${quizChoice === guidedPoint.correctChoice ? 'correct' : 'retry'}`} role="status">{quizChoice === guidedPoint.correctChoice ? guidedPoint.feedback : 'قريب من الإجابة! تأمّل الشرح والصورة، ثم جرّب مرة أخرى.'}</div>}
+            {pointForLesson && stageContent && <>
+              <div className="school-selected-stage">المرحلة {pointForLesson.number} من {stages.length} • {pointForLesson.title}</div>
+              <div className="school-feature-art">
+                {pointForLesson.group === 'butterfly' && pointForLesson.number === 1 ?
+                  <Image src="/school/figma-butterfly-eggs.svg" width={220} height={104} alt="بيوض الفراشة على ورقة نبات" /> :
+                  pointForLesson.group === 'butterfly' && pointForLesson.number === 3 ?
+                    <Image src="/school/figma-butterfly-chrysalis.svg" width={160} height={106} alt="عذراء الفراشة معلّقة بغصن" /> :
+                    <StageIllustration point={pointForLesson} />}
               </div>
-              <button type="button" className="school-read-aloud" onClick={() => say(`${activePoint.title}. ${guidedPoint.explanation}. ${guidedPoint.lookFor}`)}><Volume2 size={16} /> استمع إلى شرح المرحلة</button>
-            </div> : <div className="school-guided-prompt"><Sparkles size={18} /><p>اختر إحدى المراحل الأربع من الرسم أعلاه، لتظهر لك القصة العلمية، وما يجب ملاحظته في الكتاب، وسؤال تفاعلي قصير.</p></div>}
-            <p className="school-guided-ai-note">هذا الدرس يعمل كاملاً دون اتصال بالذكاء الاصطناعي. يمكنك الانتقال إلى «اسأل المعلم» للأسئلة الإضافية.</p>
+              <h2>{pointForLesson.title}</h2>
+              <p className="school-stage-description">{stageContent.explanation}</p>
+              <div className="school-guided-observe"><Lightbulb size={17} /><p><strong>لاحظ في الكتاب:</strong> {stageContent.lookFor}</p></div>
+              {quizContent}
+              <div className="school-learning-actions">
+                <button type="button" onClick={() => say(`${pointForLesson.title}. ${stageContent.explanation}. ${stageContent.lookFor}`)}><Volume2 size={16} /> استمع للشرح</button>
+                <button type="button" className="school-ask-voice" onClick={() => { setSideTab('assistant'); startListening(); }}><Mic size={16} /> اسأل بصوتك</button>
+              </div>
+              <div className="school-assistant-context"><BookOpen size={13} /> المساعد يعرف: صفحة {page} • {pointForLesson.title}</div>
+              <details className="school-guided-why"><summary>لماذا هذه المرحلة مهمة؟</summary><p>{stageContent.why}</p></details>
+            </>}
+            <nav className="school-stage-switcher" aria-label="التنقل بين مراحل دورة الحياة">
+              {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); choosePoint(point); }}>
+                {point.number}. {point.title}
+              </button>)}
+            </nav>
+            <div className="school-audio-tools">
+              <button type="button" onClick={() => { setSound(true); say('مرحباً بكم يا أبطال في مدرسة الفردوس الابتدائية. اليوم سنكتشف معاً دورة حياة الحيوانات. هيا نبدأ!'); }}><Play size={13} /> الترحيب</button>
+              <button type="button" onClick={() => { setSound((prev) => !prev); window.speechSynthesis?.cancel(); }}>{sound ? <Volume2 size={14} /> : <VolumeX size={14} />}{sound ? 'الصوت يعمل' : 'الصوت متوقف'}</button>
+            </div>
+            <p className="school-guided-ai-note">المحتوى التعليمي متاح دون ذكاء اصطناعي؛ المساعد للأسئلة الإضافية فقط.</p>
+          </div> : sideTab === 'activity' ? <div className="school-guided-content" role="tabpanel">
+            <span className="school-guided-label">نشاط تعليمي مُعدّ مسبقاً</span>
+            <h2>اختبر معلوماتك</h2>
+            <p className="school-guided-intro">اختر المرحلة التي تريد مراجعتها، ثم أجب عن السؤال. يمكنك الرجوع إلى الكتاب في أي وقت.</p>
+            <nav className="school-stage-switcher" aria-label="اختيار مرحلة النشاط">
+              {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); setActivePoint(point); setQuizChoice(null); }}>
+                {point.number}. {point.title}
+              </button>)}
+            </nav>
+            {quizContent}
           </div> : <>
             <div className="school-chat" aria-live="polite" role="tabpanel">
               <div className="school-chat-context"><BookOpen size={14} /> سؤال إضافي عن صفحة {page}{activePoint ? ` • ${activePoint.title}` : ''}</div>
