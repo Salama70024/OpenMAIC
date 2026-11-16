@@ -190,6 +190,7 @@
 .school-workspace.school-chat-hidden { grid-template-columns:210px minmax(0,1fr) auto; }
 .school-workspace.school-index-hidden { grid-template-columns:minmax(0,1fr) 300px; }
 .school-workspace.school-index-hidden.school-chat-hidden { grid-template-columns:minmax(0,1fr) auto; }
+.school-open-chat { align-self:start; justify-self:start; height:44px; max-height:44px; padding:9px 12px; border-radius:11px; background:#5d5bdd; font-size:12px; box-shadow:0 4px 12px #5d5bdd25; }
 .school-workspace.school-reading-mode { grid-template-columns:minmax(0,1fr); max-width:1920px; }
 .school-workspace.school-reading-mode .school-reader-scroll { height:auto; max-height:none; }
 .school-assistant { display:flex; flex-direction:column; }
