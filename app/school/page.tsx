@@ -13,6 +13,8 @@ import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
 import { guidedStages } from '@/lib/school/learning-content';
 import { StageIllustration } from './StageIllustration';
 import { ButterflySimulation } from './ButterflySimulation';
+import { StageNarrationButton } from './StageNarrationButton';
+import { SchoolVoiceConversation } from './SchoolVoiceConversation';
 import '@fontsource/noto-sans-arabic/arabic-400.css';
 import '@fontsource/noto-sans-arabic/arabic-700.css';
 import './school.css';
@@ -34,6 +36,8 @@ type Recognition = {
 
 function say(text: string) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  window.dispatchEvent(new Event('school-stop-narration'));
+  window.dispatchEvent(new Event('school-stop-live-voice'));
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'ar-IQ';
@@ -396,7 +400,6 @@ export default function SchoolPage() {
             onDiscoveryChange={setSimulationDiscovered}
             onAnswerChange={setSimulationAnswer}
             onShowBook={() => setReaderMode('book')}
-            onNarrate={say}
           />}
         </section>
 
@@ -422,7 +425,7 @@ export default function SchoolPage() {
               <div className="school-guided-observe"><Lightbulb size={17} /><p><strong>لاحظ في الكتاب:</strong> {stageContent.lookFor}</p></div>
               {quizContent}
               <div className="school-learning-actions">
-                <button type="button" onClick={() => say(`${pointForLesson.title}. ${stageContent.explanation}. ${stageContent.lookFor}`)}><Volume2 size={16} /> استمع للشرح</button>
+              <StageNarrationButton key={pointForLesson.id} audioId={pointForLesson.id}>استمع للشرح</StageNarrationButton>
                 <button type="button" className="school-ask-voice" disabled={assistantReady !== 'ready'} title={assistantReady === 'ready' ? 'اسأل بصوتك' : 'المساعد غير متصل بعد'} onClick={() => { setSideTab('assistant'); startListening(); }}><Mic size={16} /> اسأل بصوتك</button>
               </div>
               <div className="school-assistant-context"><BookOpen size={13} /> المساعد يعرف: صفحة {page} • {pointForLesson.title}</div>
@@ -435,7 +438,7 @@ export default function SchoolPage() {
               </button>)}
             </nav>
             <div className="school-audio-tools">
-              <button type="button" onClick={() => { setSound(true); say('مرحباً بكم يا أبطال في مدرسة الفردوس الابتدائية. اليوم سنكتشف معاً دورة حياة الحيوانات. هيا نبدأ!'); }}><Play size={13} /> الترحيب</button>
+              <StageNarrationButton audioId="welcome">الترحيب</StageNarrationButton>
               <button type="button" onClick={() => { setSound((prev) => !prev); window.speechSynthesis?.cancel(); }}>{sound ? <Volume2 size={14} /> : <VolumeX size={14} />}{sound ? 'الصوت يعمل' : 'الصوت متوقف'}</button>
             </div>
             <p className="school-guided-ai-note">المحتوى التعليمي متاح دون ذكاء اصطناعي؛ المساعد للأسئلة الإضافية فقط.</p>
@@ -453,6 +456,20 @@ export default function SchoolPage() {
           </div> : <>
             <div className="school-chat" aria-live="polite" role="tabpanel">
               <div className="school-chat-context"><BookOpen size={14} /> صفحة {page}{pointForLesson ? ` • ${pointForLesson.title}` : ''}{readerMode === 'simulation' ? ' • المحاكاة' : ''}</div>
+              <SchoolVoiceConversation
+                snapshot={{
+                  page,
+                  pointId: pointForLesson?.id,
+                  mode: readerMode,
+                  discoveryShown: readerMode === 'simulation' ? simulationDiscovered : false,
+                  quizChoice: readerMode === 'simulation' ? simulationAnswer : quizChoice,
+                }}
+                enabled={assistantReady === 'ready'}
+                onBegin={() => {
+                  window.dispatchEvent(new Event('school-stop-narration'));
+                  window.speechSynthesis?.cancel();
+                }}
+              />
               {readerMode === 'simulation' && <div className="school-chat-learning-state">
                 <strong>أنا أتابع ما تتعلمه الآن</strong>
                 <span>المرحلة {simulationStage + 1} من 4: {pointForLesson?.title}</span>

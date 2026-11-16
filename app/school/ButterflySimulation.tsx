@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
 import { guidedStages } from '@/lib/school/learning-content';
 import { lessonPoints } from '@/lib/school/lesson';
+import { StageNarrationButton } from './StageNarrationButton';
 
 const butterflyStages = lessonPoints.filter((point) => point.group === 'butterfly');
 
@@ -22,11 +23,10 @@ type Props = {
   onDiscoveryChange: (discovered: boolean) => void;
   onAnswerChange: (choice: number) => void;
   onShowBook: () => void;
-  onNarrate: (text: string) => void;
 };
 
 /** A teacher-authored, offline-capable simulation; no model or external service is used. */
-export function ButterflySimulation({ stage, discovered, answer, onStageChange, onDiscoveryChange, onAnswerChange, onShowBook, onNarrate }: Props) {
+export function ButterflySimulation({ stage, discovered, answer, onStageChange, onDiscoveryChange, onAnswerChange, onShowBook }: Props) {
   const [playing, setPlaying] = useState(false);
   const [finished, setFinished] = useState(false);
   const point = butterflyStages[stage];
@@ -105,7 +105,7 @@ export function ButterflySimulation({ stage, discovered, answer, onStageChange, 
           <h3>{point.title}</h3>
           <p className="school-sim-description">{lesson.explanation}</p>
           <div className="school-sim-insight"><strong>لاحظ في الكتاب</strong><p>{lesson.lookFor}</p></div>
-          <button type="button" className="school-sim-listen" onClick={() => onNarrate(`${point.title}. ${lesson.explanation}`)}><Volume2 size={16} /> استمع إلى شرح المرحلة</button>
+          <StageNarrationButton key={point.id} audioId={point.id} className="school-sim-listen">استمع إلى شرح المرحلة</StageNarrationButton>
           <div className="school-sim-quiz">
             <strong><Check size={16} /> تحقّق من فهمك</strong>
             <p>{lesson.question}</p>
