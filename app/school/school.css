@@ -233,3 +233,75 @@
 @media (max-width:1200px) { .school-workspace { grid-template-columns:190px minmax(0,1fr) 280px; gap:10px; padding:10px; } .school-workspace.school-index-hidden {grid-template-columns:minmax(0,1fr) 280px;} .school-reader-modes > span {padding:8px;} .school-reader-controls {gap:3px;} }
 @media (max-width:1050px) { .school-chapters {display:none;} .school-workspace,.school-workspace.school-chat-hidden,.school-workspace.school-index-hidden {grid-template-columns:minmax(0,1fr) 280px;} .school-assistant {grid-column:auto;} .school-open-chat {grid-column:auto;} .school-header {flex-wrap:nowrap;} }
 @media (max-width:800px) { .school-header {height:auto; min-height:64px; flex-wrap:wrap; padding:9px 14px;} .school-brand {min-width:0;} .school-lesson-heading {order:3; flex-basis:100%;} .school-home {min-width:0;} .school-workspace,.school-workspace.school-chat-hidden,.school-workspace.school-index-hidden {height:auto; min-height:0; grid-template-columns:minmax(0,1fr); padding:10px;} .school-reader {height:740px;} .school-reader-top {height:auto; min-height:54px; flex-wrap:wrap;} .school-reader-controls {flex-wrap:wrap;} .school-reader-scroll {min-height:540px;} .school-assistant {grid-column:auto; height:620px; min-height:0;} .school-workspace.school-reading-mode .school-reader {height:calc(100dvh - 125px);min-height:550px;} }
+
+/* Teacher-authored butterfly simulation: every stage remains available without AI. */
+.school-reader-modes > button { display:flex; align-items:center; gap:6px; padding:9px 13px; border:0; border-radius:9px; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.school-reader-modes > button.school-reader-mode-active { background:#5e5cd9; color:#fff; }
+.school-reader-modes > button.school-reader-mode-inactive { background:#f1f3fa; color:#65738c; }
+.school-reader-modes > button:focus-visible,.school-simulation button:focus-visible { outline:3px solid #b0a8ff; outline-offset:2px; }
+.school-simulation { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:21px 24px 16px; color:#273956; background:linear-gradient(160deg,#fafdff 0%,#f5f8ff 65%,#f8f8ff 100%); }
+.school-sim-header { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:19px; }
+.school-sim-eyebrow { color:#488e73; background:#e9f8ec; border-radius:40px; padding:5px 11px; font-size:11px; font-weight:700; }
+.school-sim-header h2 { margin:10px 0 3px; font-size:clamp(21px,2vw,27px); line-height:1.6; color:#263d62; }
+.school-sim-header p { margin:0; color:#697d98; font-size:12px; line-height:1.8; }
+.school-sim-book-link { display:flex; align-items:center; gap:7px; white-space:nowrap; border:1px solid #d9e0ef; background:#fff; color:#5161a3; padding:9px 11px; border-radius:10px; font-size:11px; }
+.school-sim-body { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(235px,1fr); gap:16px; align-items:stretch; }
+.school-sim-main { min-width:0; display:flex; flex-direction:column; }
+.school-sim-scene { position:relative; border:1px solid #d9e8db; border-radius:17px; overflow:hidden; aspect-ratio:760/440; background:#effbf7; box-shadow:0 9px 24px #acc8b322; }
+.school-sim-svg { display:block; width:100%; height:100%; animation:school-sim-enter .5s ease both; }
+.school-sim-sky-label { position:absolute; top:13px; right:14px; z-index:1; display:flex; align-items:center; gap:6px; background:#ffffffdd; border:1px solid #e2f1e4; color:#52866b; border-radius:20px; padding:5px 10px; font-size:10px; }
+.school-sim-live-dot { background:#4bb982; border-radius:50%; width:7px; height:7px; box-shadow:0 0 0 3px #4bb98222; }
+.school-sim-discover { position:absolute; bottom:13px; right:50%; transform:translateX(50%); z-index:2; display:flex; align-items:center; gap:8px; padding:9px 15px; color:#334e76; background:#fffffff2; border:1px solid #dadff0; box-shadow:0 3px 12px #2e48642e; border-radius:35px; font-size:11px; font-weight:700; }
+.school-sim-discover:hover { border-color:#9296eb; background:#f1f1ff; }
+.school-sim-discover-ring { display:grid; place-items:center; width:23px; height:23px; border-radius:50%; background:#655cdd; color:#fff; font-size:20px; line-height:1; animation:school-sim-ring 2.1s ease-in-out infinite; }
+.school-sim-observation { display:flex; align-items:center; gap:9px; background:#f2f4ff; color:#606e8f; border:1px solid #e5e8fc; padding:11px 14px; min-height:56px; border-radius:11px; margin:11px 0; font-size:12px; line-height:1.8; }
+.school-sim-observation.revealed { background:#f0faee; color:#376b47; border-color:#d5ebd3; }
+.school-sim-observation > span { font-size:20px; }
+.school-sim-observation p { margin:0; }
+.school-sim-playback { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.school-sim-playback button { display:flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; border:1px solid #e1e6f2; color:#61718c; padding:10px 12px; background:#fff; font-size:11px; font-weight:700; }
+.school-sim-playback button.school-sim-play { color:#fff; background:#5f5ddc; border-color:#5f5ddc; }
+.school-sim-playback button:disabled { opacity:.45; cursor:default; }
+.school-sim-count { margin-right:auto; font:700 12px system-ui; color:#727f99; }
+.school-sim-lesson { min-width:0; display:flex; flex-direction:column; padding:15px; background:#fff; border:1px solid #e5e8f2; border-radius:15px; }
+.school-sim-stage-badge { align-self:flex-start; padding:6px 9px; font-size:11px; font-weight:700; background:#eaf8ee; color:#298b58; border-radius:24px; }
+.school-sim-lesson h3 { font-size:20px; margin:9px 0 6px; }
+.school-sim-description { font-size:12px; line-height:1.95; color:#50627a; margin:0 0 10px; }
+.school-sim-insight { border-right:3px solid #e8be65; padding:7px 11px; background:#fff9e9; border-radius:8px 0 0 8px; font-size:11px; line-height:1.8; color:#806431; }
+.school-sim-insight p { margin:2px 0 0; }
+.school-sim-listen { width:100%; display:flex; align-items:center; justify-content:center; gap:7px; padding:9px; margin-top:11px; border:0; background:#edecff; color:#5652be; border-radius:9px; font-size:11px; font-weight:700; }
+.school-sim-quiz { margin-top:13px; padding:12px; background:#f4f6fd; border-radius:11px; }
+.school-sim-quiz > strong { display:flex; align-items:center; gap:7px; color:#434d91; font-size:12px; }
+.school-sim-quiz > p { font-size:11px; font-weight:700; line-height:1.85; margin:8px 0; }
+.school-sim-quiz > button { display:block; width:100%; text-align:right; background:#fff; border:1px solid #e2e8f2; border-radius:8px; padding:7px 9px; font-size:11px; color:#566581; margin:5px 0; }
+.school-sim-quiz > button.chosen { border-color:#8784e5; background:#f1f0ff; }
+.school-sim-quiz > button.correct { border-color:#62be85; background:#e9faef; }
+.school-sim-quiz-result { border-radius:7px; padding:8px; font-size:11px; line-height:1.8; margin-top:8px; }
+.school-sim-quiz-result.correct { color:#247646; background:#e7f9e9; }
+.school-sim-quiz-result.retry { color:#986127; background:#fff1db; }
+.school-sim-timeline { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-top:18px; }
+.school-sim-step { display:flex; align-items:center; gap:8px; min-width:0; background:#fff; border:1px solid #e2e6f1; border-radius:12px; padding:11px 9px; color:#65738e; font-size:11px; text-align:right; }
+.school-sim-step.active { background:#f0eeff; border:2px solid #7d74e5; color:#4740aa; font-weight:700; padding:10px 8px; }
+.school-sim-step-number { display:grid; place-items:center; flex-shrink:0; width:26px; height:26px; border-radius:50%; background:#edf0f7; color:#64708d; font:700 12px system-ui; }
+.school-sim-step.active .school-sim-step-number { background:#5e5adb; color:#fff; }
+.school-sim-step > svg { margin-right:auto; flex-shrink:0; }
+.school-sim-disclaimer { margin:13px 0 0; text-align:center; color:#92a0b2; font-size:10px; line-height:1.8; }
+.school-sim-finished { margin-top:11px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-radius:10px; padding:10px 12px; background:#e8f9ef; color:#257149; font-size:11px; }
+.school-sim-finished button { margin-right:auto; border:1px solid #a8d8ba; background:#fff; color:#257149; display:flex; align-items:center; gap:6px; border-radius:8px; padding:7px; }
+.school-sim-stage-scene { animation:school-sim-enter .4s ease both; }
+.school-sim-caterpillar { animation:school-sim-crawl 2.1s ease-in-out infinite alternate; transform-origin:center; }
+.school-sim-chrysalis { animation:school-sim-sway 3.6s ease-in-out infinite alternate; transform-origin:382px 132px; }
+.school-sim-butterfly { animation:school-sim-fly 2.8s ease-in-out infinite alternate; }
+.school-sim-wing-left { animation:school-sim-wing-left .9s ease-in-out infinite alternate; transform-origin:382px 247px; }
+.school-sim-wing-right { animation:school-sim-wing-right .9s ease-in-out infinite alternate; transform-origin:382px 247px; }
+.school-sim-reveal { animation:school-sim-enter .6s ease-out both; }
+@keyframes school-sim-enter { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
+@keyframes school-sim-ring { 50% { box-shadow:0 0 0 6px #665de02e; } }
+@keyframes school-sim-crawl { to { transform:translateX(9px) translateY(-4px); } }
+@keyframes school-sim-sway { to { transform:rotate(5deg); } }
+@keyframes school-sim-fly { to { transform:translateY(-12px); } }
+@keyframes school-sim-wing-left { to { transform:scaleX(.67); } }
+@keyframes school-sim-wing-right { to { transform:scaleX(.67); } }
+@media (max-width:1450px) { .school-simulation { padding:14px; } .school-sim-body { grid-template-columns:minmax(0,1fr); } .school-sim-lesson { display:block; } .school-sim-scene { max-height:390px; } }
+@media (max-width:800px) { .school-reader:has(.school-simulation) { height:auto; min-height:650px; } .school-simulation { overflow:visible; } .school-sim-header { flex-wrap:wrap; } .school-sim-scene { min-height:210px; } .school-sim-step { padding:8px 5px; gap:4px; font-size:10px; flex-direction:column; text-align:center; } .school-sim-step.active { padding:7px 4px; } .school-sim-step > svg { display:none; } }
+@media (prefers-reduced-motion:reduce) { .school-sim-stage-scene,.school-sim-svg,.school-sim-discover-ring,.school-sim-caterpillar,.school-sim-chrysalis,.school-sim-butterfly,.school-sim-wing-left,.school-sim-wing-right,.school-sim-reveal { animation:none; } }

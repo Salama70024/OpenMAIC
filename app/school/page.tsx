@@ -12,6 +12,7 @@ import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
 import { guidedStages } from '@/lib/school/learning-content';
 import { StageIllustration } from './StageIllustration';
+import { ButterflySimulation } from './ButterflySimulation';
 import '@fontsource/noto-sans-arabic/arabic-400.css';
 import '@fontsource/noto-sans-arabic/arabic-700.css';
 import './school.css';
@@ -61,6 +62,8 @@ export default function SchoolPage() {
   const [sideTab, setSideTab] = useState<'lesson' | 'activity' | 'assistant'>('lesson');
   const [quizChoice, setQuizChoice] = useState<number | null>(null);
   const [readerExpanded, setReaderExpanded] = useState(false);
+  const [readerMode, setReaderMode] = useState<'book' | 'simulation'>('book');
+  const [simulationStage, setSimulationStage] = useState(0);
   const [sound, setSound] = useState(false);
   const [listening, setListening] = useState(false);
   const [question, setQuestion] = useState('');
@@ -123,10 +126,10 @@ export default function SchoolPage() {
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [readerMode]);
 
   useEffect(() => {
-    if (!pdf || !canvasRef.current) return;
+    if (!pdf || readerMode !== 'book' || !canvasRef.current) return;
     let canceled = false;
     let task: RenderTask | undefined;
     const canvas = canvasRef.current;
@@ -166,7 +169,7 @@ export default function SchoolPage() {
       canceled = true;
       task?.cancel();
     };
-  }, [pdf, page, viewerSize, viewMode, customScale]);
+  }, [pdf, page, viewerSize, viewMode, customScale, readerMode]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -174,6 +177,7 @@ export default function SchoolPage() {
 
   const jump = useCallback((target: number) => {
     setPage(Math.max(1, Math.min(pdf?.numPages || 216, target)));
+    setReaderMode('book');
     setActivePoint(null);
     setQuizChoice(null);
     setLoadError('');
@@ -181,6 +185,7 @@ export default function SchoolPage() {
 
   const choosePoint = (point: LessonPoint) => {
     setActivePoint(point);
+    if (point.group === 'butterfly') setSimulationStage(point.number - 1);
     setAssistantOpen(true);
     setSideTab('lesson');
     setQuizChoice(null);
@@ -190,6 +195,24 @@ export default function SchoolPage() {
   const changeZoom = (factor: number) => {
     setCustomScale(Math.max(0.3, Math.min(3, currentScaleRef.current * factor)));
     setViewMode('custom');
+  };
+
+  const chooseSimulationStage = useCallback((index: number) => {
+    const point = lessonPoints.find((item) => item.group === 'butterfly' && item.number === index + 1);
+    if (!point) return;
+    setSimulationStage(index);
+    setActivePoint(point);
+    setPage(point.page);
+    setQuizChoice(null);
+    setSideTab('lesson');
+  }, []);
+
+  const openSimulation = () => {
+    const point = activePoint?.group === 'butterfly'
+      ? activePoint
+      : lessonPoints.find((item) => item.group === 'butterfly' && (page === 74 ? item.number === 4 : item.number === 1));
+    if (point) chooseSimulationStage(point.number - 1);
+    setReaderMode('simulation');
   };
 
   const submitQuestion = async (event?: FormEvent, proposed?: string) => {
@@ -292,13 +315,13 @@ export default function SchoolPage() {
           <button type="button" className="school-hide-index" onClick={() => setChaptersOpen(false)}><PanelRightClose size={15} /> إخفاء الفهرس لتوسيع الكتاب</button>
         </aside>}
 
-        <section className="school-reader" aria-label="الكتاب الوزاري الأصلي">
+        <section className="school-reader" aria-label={readerMode === 'book' ? 'الكتاب الوزاري الأصلي' : 'محاكاة دورة حياة الفراشة'}>
           <div className="school-reader-top">
-            <div className="school-reader-modes" aria-label="طريقة التعلم">
-              <span className="school-reader-mode-active"><BookOpen size={15} /> الكتاب</span>
-              <span className="school-reader-mode-future" title="سنضيف المحاكاة عندما تكتمل المادة التعليمية">المحاكاة <small>لاحقاً</small></span>
+            <div className="school-reader-modes" role="tablist" aria-label="طريقة التعلم">
+              <button type="button" role="tab" aria-selected={readerMode === 'book'} className={readerMode === 'book' ? 'school-reader-mode-active' : 'school-reader-mode-inactive'} onClick={() => setReaderMode('book')}><BookOpen size={15} /> الكتاب</button>
+              <button type="button" role="tab" aria-selected={readerMode === 'simulation'} className={readerMode === 'simulation' ? 'school-reader-mode-active' : 'school-reader-mode-inactive'} onClick={openSimulation}><Play size={15} /> محاكاة الفراشة</button>
             </div>
-            <div className="school-reader-controls">
+            {readerMode === 'book' && <div className="school-reader-controls">
               <button type="button" onClick={() => setChaptersOpen((prev) => !prev)}
                 title={chaptersOpen ? 'إخفاء الفهرس' : 'إظهار الفهرس'} aria-label={chaptersOpen ? 'إخفاء الفهرس' : 'إظهار الفهرس'}>
                 {chaptersOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
@@ -310,9 +333,9 @@ export default function SchoolPage() {
               <button type="button" onClick={() => setViewMode('page')} className={viewMode === 'page' ? 'school-control-on' : ''} title="إظهار الصفحة كاملة">الصفحة كاملة</button>
               <button type="button" onClick={() => setViewMode('width')} className={viewMode === 'width' ? 'school-control-on' : ''} title="ملاءمة الصفحة لعرض القارئ">ملاءمة العرض</button>
               <button type="button" onClick={() => setReaderExpanded((value) => !value)} title={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'} aria-label={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'}><Maximize2 size={16} /></button>
-            </div>
+            </div>}
           </div>
-          <div className={`school-reader-scroll ${viewMode === 'page' ? 'school-fit-page' : ''}`} ref={viewerRef}>
+          {readerMode === 'book' ? <><div className={`school-reader-scroll ${viewMode === 'page' ? 'school-fit-page' : ''}`} ref={viewerRef}>
             <div className="school-page" style={{ width: canvasSize.width, height: canvasSize.height }}>
               <canvas ref={canvasRef} aria-label={`صفحة ${page} من كتاب العلوم للصف الرابع الابتدائي`} />
               {(rendering || !pdf) && !loadError && <div className="school-pdf-loading"><LoaderCircle size={30} className="school-spinner" /><span>جارٍ فتح صفحة الكتاب…</span></div>}
@@ -331,7 +354,7 @@ export default function SchoolPage() {
             <button onClick={() => jump(page - 1)} disabled={page <= 1}><ChevronRight size={18} /> السابقة</button>
             <span>الصفحة <strong>{page}</strong> من {pdf?.numPages || 216}</span>
             <button onClick={() => jump(page + 1)} disabled={page >= (pdf?.numPages || 216)}>التالية <ChevronLeft size={18} /></button>
-          </div>
+          </div></> : <ButterflySimulation stage={simulationStage} onStageChange={chooseSimulationStage} onShowBook={() => setReaderMode('book')} onNarrate={say} />}
         </section>
 
         {assistantOpen && <aside className="school-assistant">
@@ -364,7 +387,7 @@ export default function SchoolPage() {
             </>}
             <nav className="school-stage-switcher" aria-label="التنقل بين مراحل دورة الحياة">
               {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
-                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); choosePoint(point); }}>
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (readerMode === 'simulation' && point.group === 'butterfly') { chooseSimulationStage(point.number - 1); } else { if (page !== point.page) jump(point.page); choosePoint(point); } }}>
                 {point.number}. {point.title}
               </button>)}
             </nav>
@@ -379,7 +402,7 @@ export default function SchoolPage() {
             <p className="school-guided-intro">اختر المرحلة التي تريد مراجعتها، ثم أجب عن السؤال. يمكنك الرجوع إلى الكتاب في أي وقت.</p>
             <nav className="school-stage-switcher" aria-label="اختيار مرحلة النشاط">
               {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
-                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); setActivePoint(point); setQuizChoice(null); }}>
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (readerMode === 'simulation' && point.group === 'butterfly') { chooseSimulationStage(point.number - 1); setSideTab('activity'); } else { if (page !== point.page) jump(point.page); setActivePoint(point); setQuizChoice(null); } }}>
                 {point.number}. {point.title}
               </button>)}
             </nav>
