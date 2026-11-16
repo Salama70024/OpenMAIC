@@ -111,7 +111,7 @@ export default function SchoolPage() {
         setCanvasSize({ width: viewport.width, height: viewport.height });
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Canvas unavailable');
-        task = sheet.render({ canvasContext: ctx, canvas, viewport, transform: [ratio, 0, 0, ratio, 0, 0] });
+        task = sheet.render({ canvasContext: ctx, viewport, transform: [ratio, 0, 0, ratio, 0, 0] });
         await task.promise;
         if (!canceled) setRendering(false);
       } catch (error) {
@@ -177,7 +177,7 @@ export default function SchoolPage() {
       recognitionRef.current?.stop();
       return;
     }
-    const browser = window as Window & {
+    const browser = window as unknown as {
       SpeechRecognition?: new () => Recognition;
       webkitSpeechRecognition?: new () => Recognition;
     };
