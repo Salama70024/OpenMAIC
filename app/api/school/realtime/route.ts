@@ -40,9 +40,11 @@ export async function POST(request: NextRequest) {
           output_modalities: ['audio'],
           audio: {
             input: {
+              // Laptop microphones benefit from far-field noise filtering; the browser also enables echo cancellation.
+              noise_reduction: { type: 'far_field' },
               turn_detection: {
                 type: 'semantic_vad',
-                eagerness: 'auto',
+                eagerness: 'low',
                 create_response: true,
                 interrupt_response: true,
               },

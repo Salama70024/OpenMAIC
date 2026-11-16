@@ -10,7 +10,9 @@ describe('school voice context and narration', () => {
     expect(instructions).toContain('المرحلة التي يراها الطالب الآن: 2 من 4');
     expect(instructions).toContain('ضغط الطالب على زر الاستكشاف في المشهد الحالي: نعم');
     expect(instructions).toContain('أوراق النباتات');
-    expect(instructions).toContain('محادثة صوتية طبيعية');
+    expect(instructions).toContain('المساعد الافتراضي لمدرسة الفردوس الابتدائية');
+    expect(instructions).toContain('لا تبادر بالترحيب أو الشرح');
+    expect(instructions).toContain('لم أفهم سؤالك جيداً');
   });
 
   it('rejects invalid pages and normalizes an unsupported mode', () => {

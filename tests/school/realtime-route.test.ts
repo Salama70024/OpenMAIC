@@ -63,6 +63,10 @@ describe('school realtime credential endpoint', () => {
     expect(payload.expires_after.seconds).toBe(60);
     expect(payload.session.instructions).toContain('الفراشة الكاملة');
     expect(payload.session.audio.input.turn_detection.type).toBe('semantic_vad');
+    expect(payload.session.audio.input.turn_detection.eagerness).toBe('low');
+    expect(payload.session.audio.input.noise_reduction.type).toBe('far_field');
+    expect(payload.session.instructions).toContain('المساعد الافتراضي لمدرسة الفردوس الابتدائية');
+    expect(payload.session.instructions).toContain('لا تبادر بالترحيب أو الشرح');
     expect(payload.session.audio.output.voice).toBe('marin');
   });
 });

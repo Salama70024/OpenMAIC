@@ -335,7 +335,7 @@ export default function SchoolPage() {
       <header className="school-header">
         <div className="school-brand">
           <span className="school-brand-icon"><GraduationCap size={24} /></span>
-          <div><strong>مدرسة الفردوس الافتراضية</strong><small>العلم يصبح تجربةً نعيشها</small></div>
+          <div><strong>مدرسة الفردوس الابتدائية</strong><small>العلم يصبح تجربةً نعيشها</small></div>
         </div>
         <div className="school-lesson-heading"><strong>دورات حياة الحيوانات</strong><small>علوم • الرابع الابتدائي</small></div>
         <Link href="/" className="school-home"><ArrowLeft size={17} /> جميع الدروس</Link>
@@ -500,7 +500,7 @@ export default function SchoolPage() {
         </aside>}
         {!assistantOpen && <button className="school-open-chat" onClick={() => setAssistantOpen(true)}><BookOpen size={20} /> افتح لوحة التعلم</button>}
       </section>
-      <footer className="school-footer">نموذج أولي تعليمي — مدرسة الفردوس الافتراضية • الصف الرابع • علوم</footer>
+      <footer className="school-footer">نموذج أولي تعليمي — مدرسة الفردوس الابتدائية • الصف الرابع • علوم</footer>
     </main>
   );
 }
