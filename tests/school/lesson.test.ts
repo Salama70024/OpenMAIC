@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bookPages, getLessonContext, lessonPoints } from '@/lib/school/lesson';
+import { guidedStages } from '@/lib/school/learning-content';
 
 describe('interactive school science lesson', () => {
   it('anchors every hotspot to an actual PDF page using normalized coordinates', () => {
@@ -27,5 +28,19 @@ describe('interactive school science lesson', () => {
     expect(butterfly.facts).not.toContain('أبو ذنيبة');
     expect(frog.selected?.title).toBe('أبو ذنيبة');
     expect(frog.facts).not.toContain('الفراشة');
+  });
+
+  it('includes complete teacher-authored explanations and quizzes for every interactive stage', () => {
+    for (const point of lessonPoints) {
+      const content = guidedStages[point.id];
+      expect(content, `${point.id} is missing its authored lesson`).toBeDefined();
+      expect(content.explanation.length).toBeGreaterThan(40);
+      expect(content.lookFor.length).toBeGreaterThan(10);
+      expect(content.why.length).toBeGreaterThan(10);
+      expect(content.choices).toHaveLength(3);
+      expect(content.correctChoice).toBeGreaterThanOrEqual(0);
+      expect(content.correctChoice).toBeLessThan(3);
+      expect(content.feedback.length).toBeGreaterThan(10);
+    }
   });
 });

@@ -5,10 +5,12 @@ import Link from 'next/link';
 import {
   ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, GraduationCap,
   HelpCircle, Lightbulb, LoaderCircle, Maximize2, MessageCircle, Mic, MicOff,
-  Play, Send, Sparkles, Volume2, VolumeX, X,
+  Play, Send, Sparkles, Volume2, VolumeX, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
+import { guidedIntroductions, guidedStages } from '@/lib/school/learning-content';
+import { StageIllustration } from './StageIllustration';
 import './school.css';
 
 const BOOK_DATA_URL = '/school/grade-4-science.base64.txt';
@@ -41,12 +43,17 @@ export default function SchoolPage() {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(START_PAGE);
   const [loadError, setLoadError] = useState('');
-  const [pageWidth, setPageWidth] = useState(700);
+  const [viewerSize, setViewerSize] = useState({ width: 760, height: 680 });
+  const [viewMode, setViewMode] = useState<'page' | 'width' | 'custom'>('page');
+  const [customScale, setCustomScale] = useState(1);
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [canvasSize, setCanvasSize] = useState({ width: 700, height: 990 });
   const [rendering, setRendering] = useState(true);
   const [activePoint, setActivePoint] = useState<LessonPoint | null>(null);
   const [markersVisible, setMarkersVisible] = useState(true);
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const [sideTab, setSideTab] = useState<'lesson' | 'assistant'>('lesson');
+  const [quizChoice, setQuizChoice] = useState<number | null>(null);
   const [readerExpanded, setReaderExpanded] = useState(false);
   const [sound, setSound] = useState(false);
   const [listening, setListening] = useState(false);
@@ -60,6 +67,7 @@ export default function SchoolPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<Recognition | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const currentScaleRef = useRef(1);
 
   useEffect(() => {
     let active = true;
@@ -101,7 +109,11 @@ export default function SchoolPage() {
     if (!viewerRef.current) return;
     const node = viewerRef.current;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setPageWidth(Math.max(240, Math.floor(entry.contentRect.width - 24)));
+      if (entry) {
+        const width = Math.floor(entry.contentRect.width);
+        const height = Math.floor(entry.contentRect.height);
+        setViewerSize((previous) => previous.width === width && previous.height === height ? previous : { width, height });
+      }
     });
     observer.observe(node);
     return () => observer.disconnect();
@@ -119,7 +131,12 @@ export default function SchoolPage() {
         const sheet = await pdf.getPage(page);
         if (canceled) return;
         const native = sheet.getViewport({ scale: 1 });
-        const viewport = sheet.getViewport({ scale: pageWidth / native.width });
+        const fitWidth = Math.max(220, viewerSize.width - 34) / native.width;
+        const fitHeight = Math.max(260, viewerSize.height - 40) / native.height;
+        const scale = viewMode === 'page' ? Math.min(fitWidth, fitHeight) : viewMode === 'width' ? fitWidth : customScale;
+        const viewport = sheet.getViewport({ scale });
+        currentScaleRef.current = scale;
+        setZoomPercent(Math.round(scale * 100));
         const ratio = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.round(viewport.width * ratio);
         canvas.height = Math.round(viewport.height * ratio);
@@ -143,7 +160,7 @@ export default function SchoolPage() {
       canceled = true;
       task?.cancel();
     };
-  }, [pdf, page, pageWidth]);
+  }, [pdf, page, viewerSize, viewMode, customScale]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -158,7 +175,14 @@ export default function SchoolPage() {
   const choosePoint = (point: LessonPoint) => {
     setActivePoint(point);
     setAssistantOpen(true);
+    setSideTab('lesson');
+    setQuizChoice(null);
     if (sound) say(`${point.title}. ${point.description}`);
+  };
+
+  const changeZoom = (factor: number) => {
+    setCustomScale(Math.max(0.3, Math.min(3, currentScaleRef.current * factor)));
+    setViewMode('custom');
   };
 
   const submitQuestion = async (event?: FormEvent, proposed?: string) => {
@@ -219,6 +243,10 @@ export default function SchoolPage() {
   };
 
   const hotspots = lessonPoints.filter((point) => point.page === page);
+  const currentGroup = page >= 78 ? 'frog' : 'butterfly';
+  const stages = lessonPoints.filter((point) => point.group === currentGroup);
+  const lessonIntroduction = guidedIntroductions[currentGroup];
+  const guidedPoint = activePoint ? guidedStages[activePoint.id] : null;
 
   return (
     <main className="school-app" dir="rtl">
@@ -235,7 +263,7 @@ export default function SchoolPage() {
         <div>
           <span className="school-eyebrow"><Sparkles size={15} /> الدرس التفاعلي الأول</span>
           <h1>دورات حياة الحيوانات <span>🦋</span></h1>
-          <p>الكتاب الوزاري الأصلي أمامك. اضغط على الدوائر المضيئة لتتعرف إلى كل مرحلة، أو اسأل المعلم الذكي مباشرة.</p>
+          <p>الكتاب الوزاري الأصلي أمامك، ومعه شرح مصوّر وأنشطة أعددناها للدرس. اضغط على المراحل لتتعلم بنفسك، واستعن بالمعلم الذكي عند الحاجة.</p>
         </div>
         <div className="school-intro-actions">
           <button className="school-start" onClick={() => { setSound(true); say('مرحباً بكم يا أبطال في مدرسة الفردوس الابتدائية. اليوم سنكتشف معاً أسرار دورة حياة الحيوانات. هيا نبدأ!'); }}><Play size={18} fill="currentColor" /> تشغيل الترحيب الصوتي</button>
@@ -265,10 +293,15 @@ export default function SchoolPage() {
             <div className="school-reader-title"><BookOpen size={19} /><strong>الكتاب المدرسي الرسمي</strong><span className="school-reader-subtitle">نسخة تفاعلية</span></div>
             <div className="school-reader-controls">
               <button onClick={() => setMarkersVisible((prev) => !prev)} className={markersVisible ? 'school-control-on' : ''}><Sparkles size={16} /> نقاط الشرح</button>
+              <button type="button" onClick={() => changeZoom(0.8)} title="تصغير الصفحة" aria-label="تصغير الصفحة"><ZoomOut size={16} /></button>
+              <span className="school-zoom-label" dir="ltr">{zoomPercent}%</span>
+              <button type="button" onClick={() => changeZoom(1.25)} title="تكبير الصفحة" aria-label="تكبير الصفحة"><ZoomIn size={16} /></button>
+              <button type="button" onClick={() => setViewMode('page')} className={viewMode === 'page' ? 'school-control-on' : ''} title="إظهار الصفحة كاملة">الصفحة كاملة</button>
+              <button type="button" onClick={() => setViewMode('width')} className={viewMode === 'width' ? 'school-control-on' : ''} title="ملاءمة الصفحة لعرض القارئ">ملاءمة العرض</button>
               <button type="button" onClick={() => setReaderExpanded((value) => !value)} title={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'} aria-label={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'}><Maximize2 size={16} /></button>
             </div>
           </div>
-          <div className="school-reader-scroll" ref={viewerRef}>
+          <div className={`school-reader-scroll ${viewMode === 'page' ? 'school-fit-page' : ''}`} ref={viewerRef}>
             <div className="school-page" style={{ width: canvasSize.width, height: canvasSize.height }}>
               <canvas ref={canvasRef} aria-label={`صفحة ${page} من كتاب العلوم للصف الرابع الابتدائي`} />
               {(rendering || !pdf) && !loadError && <div className="school-pdf-loading"><LoaderCircle size={30} className="school-spinner" /><span>جارٍ فتح صفحة الكتاب…</span></div>}
@@ -281,7 +314,7 @@ export default function SchoolPage() {
           {activePoint && <div className="school-explain" role="region" aria-label="شرح النقطة المختارة">
             <button className="school-close-explain" onClick={() => setActivePoint(null)} aria-label="إغلاق الشرح"><X size={17} /></button>
             <span className="school-explain-number">{activePoint.number}</span>
-            <div><strong>{activePoint.title}</strong><p>{activePoint.description}</p><button onClick={() => void submitQuestion(undefined, activePoint.question)}><MessageCircle size={15} /> اسأل المساعد: {activePoint.question}</button></div>
+            <div><strong>{activePoint.title}</strong><p>{activePoint.description}</p><button onClick={() => { setReaderExpanded(false); setAssistantOpen(true); setSideTab('lesson'); }}><BookOpen size={15} /> عرض الشرح والأنشطة</button></div>
           </div>}
           <div className="school-reader-footer">
             <button onClick={() => jump(page - 1)} disabled={page <= 1}><ChevronRight size={18} /> السابقة</button>
@@ -291,20 +324,51 @@ export default function SchoolPage() {
         </section>
 
         {assistantOpen && <aside className="school-assistant">
-          <div className="school-assistant-head"><span className="school-ai-avatar"><Sparkles size={22} /></span><div><strong>المعلم الذكي</strong><small><span className="school-online-dot" /> يفهم الصفحة الحالية</small></div><button onClick={() => setAssistantOpen(false)} title="إغلاق المحادثة"><X size={18} /></button></div>
-          <div className="school-chat" aria-live="polite">
-            <div className="school-chat-context"><BookOpen size={14} /> مرتبط بصفحة {page}{activePoint ? ` • ${activePoint.title}` : ''}</div>
-            {chat.map((item, index) => <div key={index} className={`school-chat-bubble ${item.from === 'teacher' ? 'teacher' : 'assistant'}`}>{item.text}</div>)}
-            {asking && <div className="school-chat-bubble assistant"><LoaderCircle size={17} className="school-spinner" /> لحظة، أفكر معك…</div>}
-            <div ref={chatEndRef} />
+          <div className="school-assistant-head"><span className="school-ai-avatar"><BookOpen size={22} /></span><div><strong>رحلة التعلّم</strong><small>شرح ورسومات وأنشطة داخل الدرس</small></div><button onClick={() => setAssistantOpen(false)} title="إغلاق لوحة التعلم" aria-label="إغلاق لوحة التعلم"><X size={18} /></button></div>
+          <div className="school-panel-tabs" role="tablist" aria-label="محتوى التعلم والمساعد">
+            <button type="button" role="tab" aria-selected={sideTab === 'lesson'} className={sideTab === 'lesson' ? 'active' : ''} onClick={() => setSideTab('lesson')}><BookOpen size={15} /> الدرس المصوّر</button>
+            <button type="button" role="tab" aria-selected={sideTab === 'assistant'} className={sideTab === 'assistant' ? 'active' : ''} onClick={() => setSideTab('assistant')}><MessageCircle size={15} /> اسأل المعلم (اختياري)</button>
           </div>
-          <form className="school-chat-form" onSubmit={(event) => void submitQuestion(event)}>
-            <label htmlFor="school-question">اسأل عن الرسم أو الفقرة التي أمامك</label>
-            <div><button type="button" onClick={startListening} className={listening ? 'school-mic-active' : ''} title="تسجيل سؤال صوتي">{listening ? <MicOff size={20} /> : <Mic size={20} />}</button><input id="school-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={listening ? 'أستمع إلى سؤالك…' : 'مثلاً: ماذا يحدث داخل الشرنقة؟'} /><button type="submit" disabled={asking || !question.trim()} title="إرسال السؤال"><Send size={18} /></button></div>
-            <small><Check size={12} /> يستند إلى موضوع الدرس • الصوت التجريبي يعتمد على المتصفح</small>
-          </form>
+          {sideTab === 'lesson' ? <div className="school-guided-content" role="tabpanel">
+            <span className="school-guided-label">محتوى تعليمي مُعدّ مسبقاً</span>
+            <h2>{lessonIntroduction.title}</h2>
+            <p className="school-guided-intro">{lessonIntroduction.intro}</p>
+            <div className="school-cycle-grid" aria-label={`مخطط ${lessonIntroduction.title}`}>
+              {stages.map((point) => <button type="button" key={point.id} className={`school-cycle-stage ${activePoint?.id === point.id ? 'active' : ''}`} onClick={() => { if (page !== point.page) jump(point.page); choosePoint(point); }} aria-pressed={activePoint?.id === point.id}>
+                <StageIllustration point={point} />
+                <span className="school-cycle-step"><b>{point.number}</b>{point.title}</span>
+              </button>)}
+            </div>
+            {activePoint?.group === currentGroup && guidedPoint ? <div className="school-guided-stage">
+              <div className="school-guided-stage-heading"><span>{activePoint.number}</span><h3>{activePoint.title}</h3></div>
+              <p>{guidedPoint.explanation}</p>
+              <div className="school-guided-observe"><Lightbulb size={17} /><p><strong>لاحظ في الكتاب:</strong> {guidedPoint.lookFor}</p></div>
+              <div className="school-guided-why"><strong>لماذا هذه المرحلة مهمة؟</strong><p>{guidedPoint.why}</p></div>
+              <div className="school-guided-quiz">
+                <h4>اختبر فهمك <span>✓</span></h4>
+                <p>{guidedPoint.question}</p>
+                {guidedPoint.choices.map((choice, index) => <button type="button" key={choice} className={`${quizChoice === index ? 'chosen' : ''} ${quizChoice === index && index === guidedPoint.correctChoice ? 'correct' : ''}`} onClick={() => setQuizChoice(index)}>{choice}</button>)}
+                {quizChoice !== null && <div className={`school-quiz-feedback ${quizChoice === guidedPoint.correctChoice ? 'correct' : 'retry'}`} role="status">{quizChoice === guidedPoint.correctChoice ? guidedPoint.feedback : 'قريب من الإجابة! تأمّل الشرح والصورة، ثم جرّب مرة أخرى.'}</div>}
+              </div>
+              <button type="button" className="school-read-aloud" onClick={() => say(`${activePoint.title}. ${guidedPoint.explanation}. ${guidedPoint.lookFor}`)}><Volume2 size={16} /> استمع إلى شرح المرحلة</button>
+            </div> : <div className="school-guided-prompt"><Sparkles size={18} /><p>اختر إحدى المراحل الأربع من الرسم أعلاه، لتظهر لك القصة العلمية، وما يجب ملاحظته في الكتاب، وسؤال تفاعلي قصير.</p></div>}
+            <p className="school-guided-ai-note">هذا الدرس يعمل كاملاً دون اتصال بالذكاء الاصطناعي. يمكنك الانتقال إلى «اسأل المعلم» للأسئلة الإضافية.</p>
+          </div> : <>
+            <div className="school-chat" aria-live="polite" role="tabpanel">
+              <div className="school-chat-context"><BookOpen size={14} /> سؤال إضافي عن صفحة {page}{activePoint ? ` • ${activePoint.title}` : ''}</div>
+              <div className="school-chat-optional">المعلم الذكي ميزة اختيارية تتطلب تهيئة الاتصال على الخادم. الشرح والرسومات والأنشطة متاحة في تبويب «الدرس المصوّر» دونها.</div>
+              {chat.map((item, index) => <div key={index} className={`school-chat-bubble ${item.from === 'teacher' ? 'teacher' : 'assistant'}`}>{item.text}</div>)}
+              {asking && <div className="school-chat-bubble assistant"><LoaderCircle size={17} className="school-spinner" /> لحظة، أفكر معك…</div>}
+              <div ref={chatEndRef} />
+            </div>
+            <form className="school-chat-form" onSubmit={(event) => void submitQuestion(event)}>
+              <label htmlFor="school-question">اسأل عن الرسم أو الفقرة التي أمامك</label>
+              <div><button type="button" onClick={startListening} className={listening ? 'school-mic-active' : ''} title="تسجيل سؤال صوتي">{listening ? <MicOff size={20} /> : <Mic size={20} />}</button><input id="school-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={listening ? 'أستمع إلى سؤالك…' : 'مثلاً: ماذا يحدث داخل الشرنقة؟'} /><button type="submit" disabled={asking || !question.trim()} title="إرسال السؤال"><Send size={18} /></button></div>
+              <small><Check size={12} /> إجابات إضافية عند توفر الخدمة • الصوت يعتمد على المتصفح</small>
+            </form>
+          </>}
         </aside>}
-        {!assistantOpen && <button className="school-open-chat" onClick={() => setAssistantOpen(true)}><MessageCircle size={20} /> افتح المعلم الذكي</button>}
+        {!assistantOpen && <button className="school-open-chat" onClick={() => setAssistantOpen(true)}><BookOpen size={20} /> افتح لوحة التعلم</button>}
       </section>
       <footer className="school-footer">نموذج أولي تعليمي — مدرسة الفردوس الافتراضية • الصف الرابع • علوم</footer>
     </main>
