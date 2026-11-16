@@ -76,7 +76,14 @@ export default function SchoolPage() {
         const binary = atob(encoded.trim());
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-        pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
+        // This textbook embeds custom Arabic fonts whose CSS font-face rendering
+        // breaks letter shaping. Use PDF.js' internal glyph renderer instead so
+        // the original page typography stays intact across browsers.
+        pdfDoc = await pdfjs.getDocument({
+          data: bytes,
+          disableFontFace: true,
+          useSystemFonts: false,
+        }).promise;
         if (active) setPdf(pdfDoc);
       } catch (error) {
         console.error('Failed to open the embedded science textbook:', error);
