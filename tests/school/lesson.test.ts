@@ -28,6 +28,8 @@ describe('interactive school science lesson', () => {
     expect(butterfly.facts).not.toContain('أبو ذنيبة');
     expect(frog.selected?.title).toBe('أبو ذنيبة');
     expect(frog.facts).not.toContain('الفراشة');
+    expect(getLessonContext(73, 'frog-egg').selected).toBeUndefined();
+    expect(getLessonContext(81, 'butterfly-adult').selected).toBeUndefined();
   });
 
   it('includes complete teacher-authored explanations and quizzes for every interactive stage', () => {

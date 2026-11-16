@@ -74,9 +74,11 @@ export const bookPages = [
 ];
 
 export function getLessonContext(page: number, pointId?: string) {
-  const section = page >= 78 ? 'دورة حياة الضفدع (الفقريات)' : 'دورة حياة الفراشة (اللافقريات)';
-  const selected = lessonPoints.find((point) => point.id === pointId);
-  const relevant = lessonPoints.filter((point) => point.group === (page >= 78 ? 'frog' : 'butterfly'));
+  const group = page >= 78 ? 'frog' : 'butterfly';
+  const section = group === 'frog' ? 'دورة حياة الضفدع (الفقريات)' : 'دورة حياة الفراشة (اللافقريات)';
+  // Never let a client-supplied point ID introduce a fact from another lesson.
+  const selected = lessonPoints.find((point) => point.id === pointId && point.group === group);
+  const relevant = lessonPoints.filter((point) => point.group === group);
   return {
     section,
     selected,

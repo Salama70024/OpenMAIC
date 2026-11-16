@@ -305,3 +305,24 @@
 @media (max-width:1450px) { .school-simulation { padding:14px; } .school-sim-body { grid-template-columns:minmax(0,1fr); } .school-sim-lesson { display:block; } .school-sim-scene { max-height:390px; } }
 @media (max-width:800px) { .school-reader:has(.school-simulation) { height:auto; min-height:650px; } .school-simulation { overflow:visible; } .school-sim-header { flex-wrap:wrap; } .school-sim-scene { min-height:210px; } .school-sim-step { padding:8px 5px; gap:4px; font-size:10px; flex-direction:column; text-align:center; } .school-sim-step.active { padding:7px 4px; } .school-sim-step > svg { display:none; } }
 @media (prefers-reduced-motion:reduce) { .school-sim-stage-scene,.school-sim-svg,.school-sim-discover-ring,.school-sim-caterpillar,.school-sim-chrysalis,.school-sim-butterfly,.school-sim-wing-left,.school-sim-wing-right,.school-sim-reveal { animation:none; } }
+
+/* Keep the simulation focused on its authored lesson; the left panel holds AI help only. */
+.school-chat-learning-state { align-self:stretch; display:flex; flex-direction:column; gap:5px; padding:12px; border:1px solid #dedffb; border-radius:11px; background:#f5f4ff; color:#69729a; line-height:1.8; font-size:11px; }
+.school-chat-learning-state strong { color:#4948b2; font-size:12px; }
+.school-chat-status { align-self:stretch; display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:9px 10px; border-radius:9px; font-size:11px; line-height:1.7; }
+.school-chat-status > span { width:7px; height:7px; flex-shrink:0; border-radius:50%; }
+.school-chat-status.ready { color:#267950; background:#e9f9ef; }
+.school-chat-status.ready > span { background:#3dc783; }
+.school-chat-status.unavailable { color:#826331; background:#fff8e9; }
+.school-chat-status.unavailable > span { background:#e5b663; }
+.school-chat-status button { color:#695a44; margin-right:auto; background:#fff; border:1px solid #eadebf; padding:4px 7px; border-radius:7px; font-size:10px; }
+.school-chat-prompts { align-self:stretch; display:flex; flex-direction:column; gap:7px; font-size:11px; }
+.school-chat-prompts > span { color:#8190a7; }
+.school-chat-prompts button { border:1px solid #dedbfb; background:#faf9ff; color:#5756ab; text-align:right; padding:9px 10px; border-radius:9px; line-height:1.7; font-size:11px; }
+.school-chat-prompts button:disabled { opacity:.6; cursor:default; }
+.school-chat-bubble > span { display:block; }
+.school-chat-bubble > button { display:flex; align-items:center; gap:5px; margin-top:7px; padding:4px 0; border:0; background:transparent; color:#777bb7; font-size:10px; }
+.school-chat-form .school-chat-audio-toggle { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; height:auto; margin-top:7px; padding:5px; border:0; color:#727aa4; background:transparent; font-size:10px; }
+.school-chat-form .school-chat-audio-toggle[aria-pressed="true"] { color:#5157b5; }
+.school-chat-form input:disabled { opacity:.65; cursor:not-allowed; }
+.school-chat-status button:focus-visible,.school-chat-prompts button:focus-visible,.school-chat-bubble button:focus-visible,.school-chat-form button:focus-visible { outline:2px solid #8885e5; outline-offset:2px; }

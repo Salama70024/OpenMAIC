@@ -16,21 +16,21 @@ const interactions = [
 
 type Props = {
   stage: number;
+  discovered: boolean;
+  answer: number | null;
   onStageChange: (stage: number) => void;
+  onDiscoveryChange: (discovered: boolean) => void;
+  onAnswerChange: (choice: number) => void;
   onShowBook: () => void;
   onNarrate: (text: string) => void;
 };
 
 /** A teacher-authored, offline-capable simulation; no model or external service is used. */
-export function ButterflySimulation({ stage, onStageChange, onShowBook, onNarrate }: Props) {
+export function ButterflySimulation({ stage, discovered, answer, onStageChange, onDiscoveryChange, onAnswerChange, onShowBook, onNarrate }: Props) {
   const [playing, setPlaying] = useState(false);
-  const [discoveredStage, setDiscoveredStage] = useState<number | null>(null);
-  const [stageAnswer, setStageAnswer] = useState<{ stage: number; choice: number } | null>(null);
   const [finished, setFinished] = useState(false);
   const point = butterflyStages[stage];
   const lesson = guidedStages[point.id];
-  const discovered = discoveredStage === stage;
-  const answer = stageAnswer?.stage === stage ? stageAnswer.choice : null;
 
   useEffect(() => {
     if (!playing) return;
@@ -80,7 +80,7 @@ export function ButterflySimulation({ stage, onStageChange, onShowBook, onNarrat
             <button
               type="button"
               className="school-sim-discover"
-              onClick={() => setDiscoveredStage(discovered ? null : stage)}
+              onClick={() => onDiscoveryChange(!discovered)}
               aria-pressed={discovered}
               aria-label={interactions[stage].prompt}
             ><span className="school-sim-discover-ring">+</span> {discovered ? 'إخفاء الاكتشاف' : 'اضغط هنا للاستكشاف'}</button>
@@ -112,7 +112,7 @@ export function ButterflySimulation({ stage, onStageChange, onShowBook, onNarrat
             {lesson.choices.map((choice, index) => (
               <button type="button" key={choice}
                 className={`${answer === index ? 'chosen' : ''} ${answer === index && index === lesson.correctChoice ? 'correct' : ''}`}
-                onClick={() => setStageAnswer({ stage, choice: index })}
+                onClick={() => onAnswerChange(index)}
                 aria-pressed={answer === index}>{choice}</button>
             ))}
             {answer !== null && <div className={`school-sim-quiz-result ${answer === lesson.correctChoice ? 'correct' : 'retry'}`} role="status">

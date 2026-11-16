@@ -20,7 +20,11 @@ describe('butterfly learning simulation', () => {
   it.each([0, 1, 2, 3])('shows the authored explanation and quiz for stage %i', (stage) => {
     const markup = renderToStaticMarkup(createElement(ButterflySimulation, {
       stage,
+      discovered: false,
+      answer: null,
       onStageChange: () => undefined,
+      onDiscoveryChange: () => undefined,
+      onAnswerChange: () => undefined,
       onShowBook: () => undefined,
       onNarrate: () => undefined,
     }));

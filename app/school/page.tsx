@@ -64,10 +64,13 @@ export default function SchoolPage() {
   const [readerExpanded, setReaderExpanded] = useState(false);
   const [readerMode, setReaderMode] = useState<'book' | 'simulation'>('book');
   const [simulationStage, setSimulationStage] = useState(0);
+  const [simulationDiscovered, setSimulationDiscovered] = useState(false);
+  const [simulationAnswer, setSimulationAnswer] = useState<number | null>(null);
   const [sound, setSound] = useState(false);
   const [listening, setListening] = useState(false);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
+  const [assistantReady, setAssistantReady] = useState<'checking' | 'ready' | 'missing' | 'error'>('checking');
   const [chat, setChat] = useState<ChatEntry[]>([{
     from: 'assistant',
     text: 'أهلاً يا أبطال! اختاروا إحدى العلامات المضيئة فوق الكتاب، أو اسألوني عن دورة حياة الفراشة والضفدع.',
@@ -175,6 +178,22 @@ export default function SchoolPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [chat]);
 
+  const checkAssistant = useCallback(async () => {
+    setAssistantReady('checking');
+    try {
+      const response = await fetch('/api/school/ask', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Status check failed');
+      const status: { ready?: boolean } = await response.json();
+      setAssistantReady(status.ready ? 'ready' : 'missing');
+    } catch {
+      setAssistantReady('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (assistantOpen) void checkAssistant();
+  }, [assistantOpen, checkAssistant]);
+
   const jump = useCallback((target: number) => {
     setPage(Math.max(1, Math.min(pdf?.numPages || 216, target)));
     setReaderMode('book');
@@ -201,6 +220,8 @@ export default function SchoolPage() {
     const point = lessonPoints.find((item) => item.group === 'butterfly' && item.number === index + 1);
     if (!point) return;
     setSimulationStage(index);
+    setSimulationDiscovered(false);
+    setSimulationAnswer(null);
     setActivePoint(point);
     setPage(point.page);
     setQuizChoice(null);
@@ -213,12 +234,14 @@ export default function SchoolPage() {
       : lessonPoints.find((item) => item.group === 'butterfly' && (page === 74 ? item.number === 4 : item.number === 1));
     if (point) chooseSimulationStage(point.number - 1);
     setReaderMode('simulation');
+    setAssistantOpen(true);
+    setSideTab('assistant');
   };
 
-  const submitQuestion = async (event?: FormEvent, proposed?: string) => {
+  const submitQuestion = async (event?: FormEvent, proposed?: string, speakReply = false) => {
     event?.preventDefault();
     const text = (proposed || question).trim();
-    if (!text || asking) return;
+    if (!text || asking || assistantReady !== 'ready') return;
     setQuestion('');
     setAsking(true);
     setAssistantOpen(true);
@@ -227,12 +250,20 @@ export default function SchoolPage() {
       const response = await fetch('/api/school/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, page, pointId: activePoint?.id }),
+        body: JSON.stringify({
+          question: text,
+          page,
+          pointId: pointForLesson?.id,
+          mode: readerMode,
+          discoveryShown: readerMode === 'simulation' ? simulationDiscovered : false,
+          quizChoice: readerMode === 'simulation' ? simulationAnswer : quizChoice,
+          history: chat.slice(-6).map((item) => ({ role: item.from === 'teacher' ? 'user' : 'assistant', content: item.text })),
+        }),
       });
       const data: { answer?: string; error?: string } = await response.json();
       if (!response.ok || !data.answer) throw new Error(data.error || 'تعذر تلقي الرد');
       setChat((items) => [...items, { from: 'assistant', text: data.answer! }]);
-      if (sound) say(data.answer);
+      if (sound || speakReply) say(data.answer);
     } catch (error) {
       setChat((items) => [...items, {
         from: 'assistant',
@@ -263,7 +294,10 @@ export default function SchoolPage() {
     recognition.interimResults = false;
     recognition.onresult = (event) => {
       const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) setQuestion(transcript);
+      if (transcript) {
+        setQuestion(transcript);
+        void submitQuestion(undefined, transcript, true);
+      }
     };
     recognition.onerror = () => setListening(false);
     recognition.onend = () => setListening(false);
@@ -354,17 +388,26 @@ export default function SchoolPage() {
             <button onClick={() => jump(page - 1)} disabled={page <= 1}><ChevronRight size={18} /> السابقة</button>
             <span>الصفحة <strong>{page}</strong> من {pdf?.numPages || 216}</span>
             <button onClick={() => jump(page + 1)} disabled={page >= (pdf?.numPages || 216)}>التالية <ChevronLeft size={18} /></button>
-          </div></> : <ButterflySimulation stage={simulationStage} onStageChange={chooseSimulationStage} onShowBook={() => setReaderMode('book')} onNarrate={say} />}
+          </div></> : <ButterflySimulation
+            stage={simulationStage}
+            discovered={simulationDiscovered}
+            answer={simulationAnswer}
+            onStageChange={chooseSimulationStage}
+            onDiscoveryChange={setSimulationDiscovered}
+            onAnswerChange={setSimulationAnswer}
+            onShowBook={() => setReaderMode('book')}
+            onNarrate={say}
+          />}
         </section>
 
         {assistantOpen && <aside className="school-assistant">
-          <div className="school-assistant-head"><BookOpen size={20} /><div><strong>تعلّم خطوة بخطوة</strong><small>شرح وأنشطة مرتبطة بالكتاب</small></div><button onClick={() => setAssistantOpen(false)} title="إخفاء لوحة التعلّم" aria-label="إخفاء لوحة التعلّم"><X size={18} /></button></div>
-          <div className="school-panel-tabs" role="tablist" aria-label="محتوى التعلم والمساعد">
+          <div className="school-assistant-head"><BookOpen size={20} /><div><strong>{readerMode === 'simulation' ? 'المعلّم الذكي' : 'تعلّم خطوة بخطوة'}</strong><small>{readerMode === 'simulation' ? 'اسأل عن المرحلة التي تشاهدها' : 'شرح وأنشطة مرتبطة بالكتاب'}</small></div><button onClick={() => setAssistantOpen(false)} title="إخفاء لوحة التعلّم" aria-label="إخفاء لوحة التعلّم"><X size={18} /></button></div>
+          {readerMode === 'book' && <div className="school-panel-tabs" role="tablist" aria-label="محتوى التعلم والمساعد">
             <button type="button" role="tab" aria-selected={sideTab === 'lesson'} className={sideTab === 'lesson' ? 'active' : ''} onClick={() => setSideTab('lesson')}>الشرح</button>
             <button type="button" role="tab" aria-selected={sideTab === 'activity'} className={sideTab === 'activity' ? 'active' : ''} onClick={() => setSideTab('activity')}>نشاط</button>
             <button type="button" role="tab" aria-selected={sideTab === 'assistant'} className={sideTab === 'assistant' ? 'active' : ''} onClick={() => setSideTab('assistant')}>اسأل</button>
-          </div>
-          {sideTab === 'lesson' ? <div className="school-guided-content" role="tabpanel">
+          </div>}
+          {readerMode !== 'simulation' && sideTab === 'lesson' ? <div className="school-guided-content" role="tabpanel">
             {pointForLesson && stageContent && <>
               <div className="school-selected-stage">المرحلة {pointForLesson.number} من {stages.length} • {pointForLesson.title}</div>
               <div className="school-feature-art">
@@ -380,14 +423,14 @@ export default function SchoolPage() {
               {quizContent}
               <div className="school-learning-actions">
                 <button type="button" onClick={() => say(`${pointForLesson.title}. ${stageContent.explanation}. ${stageContent.lookFor}`)}><Volume2 size={16} /> استمع للشرح</button>
-                <button type="button" className="school-ask-voice" onClick={() => { setSideTab('assistant'); startListening(); }}><Mic size={16} /> اسأل بصوتك</button>
+                <button type="button" className="school-ask-voice" disabled={assistantReady !== 'ready'} title={assistantReady === 'ready' ? 'اسأل بصوتك' : 'المساعد غير متصل بعد'} onClick={() => { setSideTab('assistant'); startListening(); }}><Mic size={16} /> اسأل بصوتك</button>
               </div>
               <div className="school-assistant-context"><BookOpen size={13} /> المساعد يعرف: صفحة {page} • {pointForLesson.title}</div>
               <details className="school-guided-why"><summary>لماذا هذه المرحلة مهمة؟</summary><p>{stageContent.why}</p></details>
             </>}
             <nav className="school-stage-switcher" aria-label="التنقل بين مراحل دورة الحياة">
               {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
-                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (readerMode === 'simulation' && point.group === 'butterfly') { chooseSimulationStage(point.number - 1); } else { if (page !== point.page) jump(point.page); choosePoint(point); } }}>
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); choosePoint(point); }}>
                 {point.number}. {point.title}
               </button>)}
             </nav>
@@ -396,29 +439,45 @@ export default function SchoolPage() {
               <button type="button" onClick={() => { setSound((prev) => !prev); window.speechSynthesis?.cancel(); }}>{sound ? <Volume2 size={14} /> : <VolumeX size={14} />}{sound ? 'الصوت يعمل' : 'الصوت متوقف'}</button>
             </div>
             <p className="school-guided-ai-note">المحتوى التعليمي متاح دون ذكاء اصطناعي؛ المساعد للأسئلة الإضافية فقط.</p>
-          </div> : sideTab === 'activity' ? <div className="school-guided-content" role="tabpanel">
+          </div> : readerMode !== 'simulation' && sideTab === 'activity' ? <div className="school-guided-content" role="tabpanel">
             <span className="school-guided-label">نشاط تعليمي مُعدّ مسبقاً</span>
             <h2>اختبر معلوماتك</h2>
             <p className="school-guided-intro">اختر المرحلة التي تريد مراجعتها، ثم أجب عن السؤال. يمكنك الرجوع إلى الكتاب في أي وقت.</p>
             <nav className="school-stage-switcher" aria-label="اختيار مرحلة النشاط">
               {stages.map((point) => <button type="button" key={point.id} className={pointForLesson?.id === point.id ? 'active' : ''}
-                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (readerMode === 'simulation' && point.group === 'butterfly') { chooseSimulationStage(point.number - 1); setSideTab('activity'); } else { if (page !== point.page) jump(point.page); setActivePoint(point); setQuizChoice(null); } }}>
+                aria-pressed={pointForLesson?.id === point.id} onClick={() => { if (page !== point.page) jump(point.page); setActivePoint(point); setQuizChoice(null); }}>
                 {point.number}. {point.title}
               </button>)}
             </nav>
             {quizContent}
           </div> : <>
             <div className="school-chat" aria-live="polite" role="tabpanel">
-              <div className="school-chat-context"><BookOpen size={14} /> سؤال إضافي عن صفحة {page}{activePoint ? ` • ${activePoint.title}` : ''}</div>
-              <div className="school-chat-optional">المعلم الذكي ميزة اختيارية تتطلب تهيئة الاتصال على الخادم. الشرح والرسومات والأنشطة متاحة في تبويب «الدرس المصوّر» دونها.</div>
-              {chat.map((item, index) => <div key={index} className={`school-chat-bubble ${item.from === 'teacher' ? 'teacher' : 'assistant'}`}>{item.text}</div>)}
+              <div className="school-chat-context"><BookOpen size={14} /> صفحة {page}{pointForLesson ? ` • ${pointForLesson.title}` : ''}{readerMode === 'simulation' ? ' • المحاكاة' : ''}</div>
+              {readerMode === 'simulation' && <div className="school-chat-learning-state">
+                <strong>أنا أتابع ما تتعلمه الآن</strong>
+                <span>المرحلة {simulationStage + 1} من 4: {pointForLesson?.title}</span>
+                <span>{simulationDiscovered ? 'شاهدتَ الاكتشاف في الرسم.' : 'يمكنك الضغط على زر الاستكشاف في الرسم.'}</span>
+                {simulationAnswer !== null && <span>أجبتَ عن سؤال هذه المرحلة؛ يمكنك أن تسألني عن إجابتك.</span>}
+              </div>}
+              {assistantReady === 'ready' ? <div className="school-chat-status ready"><span /> تم إعداد المساعد؛ يمكنك تجربة طرح سؤال</div>
+                : <div className="school-chat-status unavailable">
+                  <span /> {assistantReady === 'checking' ? 'جارٍ فحص الاتصال بالمساعد…' : assistantReady === 'missing' ? 'المساعد غير مفعّل بعد؛ يمكنك متابعة التعلم والمحاكاة بدونه.' : 'تعذر التحقق من اتصال المساعد.'}
+                  {assistantReady !== 'checking' && <button type="button" onClick={() => void checkAssistant()}>إعادة الفحص</button>}
+                </div>}
+              {assistantReady === 'ready' && pointForLesson && <div className="school-chat-prompts" aria-label="أسئلة مقترحة">
+                <span>يمكنك أن تسألني:</span>
+                <button type="button" disabled={asking} onClick={() => void submitQuestion(undefined, pointForLesson.question)}>{pointForLesson.question}</button>
+                <button type="button" disabled={asking} onClick={() => void submitQuestion(undefined, 'اشرح لي ما أشاهده الآن بطريقة أبسط.')}>اشرح هذه المرحلة ببساطة</button>
+              </div>}
+              {chat.map((item, index) => <div key={index} className={`school-chat-bubble ${item.from === 'teacher' ? 'teacher' : 'assistant'}`}><span>{item.text}</span>{item.from === 'assistant' && <button type="button" onClick={() => say(item.text)} aria-label="استمع إلى الإجابة"><Volume2 size={14} /> استمع</button>}</div>)}
               {asking && <div className="school-chat-bubble assistant"><LoaderCircle size={17} className="school-spinner" /> لحظة، أفكر معك…</div>}
               <div ref={chatEndRef} />
             </div>
             <form className="school-chat-form" onSubmit={(event) => void submitQuestion(event)}>
-              <label htmlFor="school-question">اسأل عن الرسم أو الفقرة التي أمامك</label>
-              <div><button type="button" onClick={startListening} className={listening ? 'school-mic-active' : ''} title="تسجيل سؤال صوتي">{listening ? <MicOff size={20} /> : <Mic size={20} />}</button><input id="school-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={listening ? 'أستمع إلى سؤالك…' : 'مثلاً: ماذا يحدث داخل الشرنقة؟'} /><button type="submit" disabled={asking || !question.trim()} title="إرسال السؤال"><Send size={18} /></button></div>
-              <small><Check size={12} /> إجابات إضافية عند توفر الخدمة • الصوت يعتمد على المتصفح</small>
+              <label htmlFor="school-question">اسأل عن الرسم أو المرحلة الحالية</label>
+              <div><button type="button" disabled={assistantReady !== 'ready' || asking} onClick={startListening} className={listening ? 'school-mic-active' : ''} title={listening ? 'إيقاف الاستماع' : 'اسأل بصوتك؛ سيتم إرسال السؤال بعد التعرف عليه'}>{listening ? <MicOff size={20} /> : <Mic size={20} />}</button><input id="school-question" maxLength={600} disabled={assistantReady !== 'ready' || asking} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={assistantReady !== 'ready' ? 'المساعد غير متصل حالياً' : listening ? 'أستمع إلى سؤالك…' : 'مثلاً: ماذا يحدث داخل الشرنقة؟'} /><button type="submit" disabled={assistantReady !== 'ready' || asking || !question.trim()} title="إرسال السؤال"><Send size={18} /></button></div>
+              <button type="button" className="school-chat-audio-toggle" aria-pressed={sound} onClick={() => { setSound((value) => !value); window.speechSynthesis?.cancel(); }}>{sound ? <Volume2 size={14} /> : <VolumeX size={14} />}{sound ? 'القراءة التلقائية تعمل' : 'تفعيل القراءة التلقائية'}</button>
+              <small><Check size={12} /> الصوت يعتمد على إمكانات المتصفح • الشرح والأنشطة متاحان دائماً</small>
             </form>
           </>}
         </aside>}
