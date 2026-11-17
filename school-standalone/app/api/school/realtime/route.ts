@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSchoolVoiceInstructions, parseVoiceSnapshot } from '@/lib/school/voice-instructions';
+import { schoolVoiceTools } from '@/lib/school/voice-actions';
 
 export const runtime = 'nodejs';
 
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
           type: 'realtime',
           model,
           instructions: buildSchoolVoiceInstructions(snapshot),
+          tools: schoolVoiceTools,
+          tool_choice: 'auto',
           output_modalities: ['audio'],
           audio: {
             input: {

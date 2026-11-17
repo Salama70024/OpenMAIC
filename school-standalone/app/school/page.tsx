@@ -15,6 +15,7 @@ import { StageIllustration } from './StageIllustration';
 import { ButterflySimulation } from './ButterflySimulation';
 import { StageNarrationButton } from './StageNarrationButton';
 import { SchoolVoiceConversation } from './SchoolVoiceConversation';
+import type { SchoolVoiceAction } from '@/lib/school/voice-actions';
 import '@fontsource/noto-sans-arabic/arabic-400.css';
 import '@fontsource/noto-sans-arabic/arabic-700.css';
 import './school.css';
@@ -75,6 +76,9 @@ export default function SchoolPage() {
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const [assistantReady, setAssistantReady] = useState<'checking' | 'ready' | 'missing' | 'error'>('checking');
+  const [voiceFocus, setVoiceFocus] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState('');
+  const [voiceQuestion, setVoiceQuestion] = useState('');
   const [chat, setChat] = useState<ChatEntry[]>([{
     from: 'assistant',
     text: 'أهلاً يا أبطال! اختاروا إحدى العلامات المضيئة فوق الكتاب، أو اسألوني عن دورة حياة الفراشة والضفدع.',
@@ -242,6 +246,68 @@ export default function SchoolPage() {
     setSideTab('assistant');
   };
 
+  /** Executed only after a validated Realtime function call; keeps the audio session mounted. */
+  const executeVoiceAction = (action: SchoolVoiceAction): { ok: boolean; message: string } => {
+    if (action.type === 'navigate_page') {
+      const selected = bookPages.find((item) => item.page === action.page);
+      if (!selected) return { ok: false, message: 'هذه الصفحة ليست ضمن الدرس المتاح.' };
+      setPage(action.page);
+      setReaderMode('book');
+      setActivePoint(null);
+      setVoiceFocus(null);
+      setVoiceQuestion('');
+      setQuizChoice(null);
+      setMarkersVisible(true);
+      const message = `انتقل المعلم إلى الصفحة ${action.page}: ${selected.label}.`;
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'highlight_element') {
+      const point = lessonPoints.find((entry) => entry.id === action.element_id);
+      if (!point) return { ok: false, message: 'هذا العنصر غير موجود في الدرس.' };
+      setPage(point.page);
+      setReaderMode('book');
+      setActivePoint(point);
+      setVoiceFocus(point.id);
+      setMarkersVisible(true);
+      setVoiceQuestion('');
+      setQuizChoice(null);
+      const message = `انظر إلى «${point.title}» المحددة الآن في صفحة ${point.page}.`;
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'control_simulation') {
+      if (action.action === 'open' || action.action === 'set_stage') {
+        const stage = action.action === 'set_stage' ? (action.stage ?? 1) - 1 : simulationStage;
+        const point = lessonPoints.find((entry) => entry.group === 'butterfly' && entry.number === stage + 1);
+        if (!point) return { ok: false, message: 'مرحلة المحاكاة غير معروفة.' };
+        setSimulationStage(stage);
+        setSimulationDiscovered(false);
+        setSimulationAnswer(null);
+        setActivePoint(point);
+        setPage(point.page);
+        setReaderMode('simulation');
+        setVoiceFocus(null);
+        setVoiceQuestion('');
+        const message = `تعرض المحاكاة الآن المرحلة ${stage + 1}: ${point.title}.`;
+        setVoiceNotice(message);
+        return { ok: true, message };
+      }
+      if (readerMode !== 'simulation') return { ok: false, message: 'افتح محاكاة الفراشة أولاً.' };
+      const discovered = action.action === 'show_discovery';
+      setSimulationDiscovered(discovered);
+      const message = discovered ? 'ظهرت الآن تفاصيل الاستكشاف في المحاكاة.' : 'أُخفيت تفاصيل الاستكشاف.';
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'ask_student') {
+      setVoiceQuestion(action.question);
+      setVoiceNotice('عرض المعلم سؤالاً جديداً للتلميذ.');
+      return { ok: true, message: `ظهر السؤال على الشاشة: ${action.question}` };
+    }
+    return { ok: false, message: 'تعذر تنفيذ الطلب.' };
+  };
+
   const submitQuestion = async (event?: FormEvent, proposed?: string, speakReply = false) => {
     event?.preventDefault();
     const text = (proposed || question).trim();
@@ -354,6 +420,8 @@ export default function SchoolPage() {
         </aside>}
 
         <section className="school-reader" aria-label={readerMode === 'book' ? 'الكتاب الوزاري الأصلي' : 'محاكاة دورة حياة الفراشة'}>
+          {voiceNotice && <div className="school-voice-visual-notice" role="status"><Sparkles size={16} /><span>{voiceNotice}</span><button type="button" aria-label="إخفاء الإرشاد" onClick={() => setVoiceNotice('')}><X size={15} /></button></div>}
+          {voiceQuestion && <div className="school-voice-visual-question" role="region" aria-label="سؤال المعلّم"><HelpCircle size={22} /><div><strong>سؤال من المعلّم الذكي</strong><p>{voiceQuestion}</p></div><button type="button" aria-label="إغلاق السؤال" onClick={() => setVoiceQuestion('')}><X size={18} /></button></div>}
           <div className="school-reader-top">
             <div className="school-reader-modes" role="tablist" aria-label="طريقة التعلم">
               <button type="button" role="tab" aria-selected={readerMode === 'book'} className={readerMode === 'book' ? 'school-reader-mode-active' : 'school-reader-mode-inactive'} onClick={() => setReaderMode('book')}><BookOpen size={15} /> الكتاب</button>
@@ -379,7 +447,7 @@ export default function SchoolPage() {
               {(rendering || !pdf) && !loadError && <div className="school-pdf-loading"><LoaderCircle size={30} className="school-spinner" /><span>جارٍ فتح صفحة الكتاب…</span></div>}
               {loadError && <div className="school-pdf-loading school-pdf-error"><HelpCircle size={27} /><span>{loadError}</span></div>}
               {markersVisible && !rendering && hotspots.map((point) => (
-                <button key={point.id} className={`school-hotspot ${activePoint?.id === point.id ? 'selected' : ''}`} style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} title={point.title} onClick={() => choosePoint(point)} aria-label={`شرح: ${point.title}`}>{point.number}</button>
+                <button key={point.id} className={`school-hotspot ${activePoint?.id === point.id ? 'selected' : ''} ${voiceFocus === point.id ? 'voice-focus' : ''}`} style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} title={point.title} onClick={() => choosePoint(point)} aria-label={`شرح: ${point.title}`}>{point.number}</button>
               ))}
             </div>
           </div>
@@ -465,6 +533,7 @@ export default function SchoolPage() {
                   quizChoice: readerMode === 'simulation' ? simulationAnswer : quizChoice,
                 }}
                 enabled={assistantReady === 'ready'}
+                onToolAction={executeVoiceAction}
                 onBegin={() => {
                   window.dispatchEvent(new Event('school-stop-narration'));
                   window.speechSynthesis?.cancel();

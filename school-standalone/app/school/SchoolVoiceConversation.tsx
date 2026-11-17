@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Mic, MicOff, PhoneOff, Radio } from 'lucide-react';
 import { buildSchoolVoiceInstructions } from '@/lib/school/voice-instructions';
+import { parseSchoolVoiceAction, type SchoolVoiceAction } from '@/lib/school/voice-actions';
 import type { LearningSnapshot } from '@/lib/school/assistant-context';
 
 type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'speaking';
@@ -21,9 +22,10 @@ type Props = {
   snapshot: LearningSnapshot;
   enabled: boolean;
   onBegin?: () => void;
+  onToolAction: (action: SchoolVoiceAction) => { ok: boolean; message: string };
 };
 
-export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
+export function SchoolVoiceConversation({ snapshot, enabled, onBegin, onToolAction }: Props) {
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [muted, setMuted] = useState(false);
   const [message, setMessage] = useState('');
@@ -31,6 +33,10 @@ export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
   const attemptRef = useRef(0);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
+  const actionRef = useRef(onToolAction);
+  actionRef.current = onToolAction;
+  const handledCallsRef = useRef(new Set<string>());
+  const [toolMessage, setToolMessage] = useState('');
 
   const stop = useCallback((reason = '') => {
     attemptRef.current += 1;
@@ -52,6 +58,8 @@ export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
     setMuted(false);
     setStatus('idle');
     setMessage(reason);
+    setToolMessage('');
+    handledCallsRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -98,6 +106,8 @@ export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
     const attempt = ++attemptRef.current;
     setStatus('connecting');
     setMessage('');
+    setToolMessage('');
+    handledCallsRef.current.clear();
     setMuted(false);
     onBegin?.();
 
@@ -152,10 +162,45 @@ export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
       channel.onmessage = (event) => {
         if (attempt !== attemptRef.current) return;
         try {
-          const item: { type?: string; error?: { message?: string } } = JSON.parse(event.data);
+          const item: {
+            type?: string;
+            error?: { message?: string };
+            response?: { status?: string; output?: Array<{ type?: string; call_id?: string; name?: string; arguments?: string }> };
+          } = JSON.parse(event.data);
           if (item.type === 'input_audio_buffer.speech_started') setStatus('listening');
           if (item.type === 'response.created' || item.type === 'response.output_audio.delta') setStatus('speaking');
-          if (item.type === 'response.done') setStatus('listening');
+          if (item.type === 'response.done') {
+            setStatus('listening');
+            const calls = item.response?.status === 'completed'
+              ? (item.response.output ?? []).filter((entry) => entry.type === 'function_call' && typeof entry.call_id === 'string')
+              : [];
+            if (calls.length && channel.readyState === 'open') {
+              void (async () => {
+                let processed = 0;
+                for (const call of calls) {
+                  if (!call.call_id || handledCallsRef.current.has(call.call_id)) continue;
+                  handledCallsRef.current.add(call.call_id);
+                  const action = parseSchoolVoiceAction(call.name, call.arguments);
+                  let result: { ok: boolean; message: string };
+                  try {
+                    result = action ? actionRef.current(action) : { ok: false, message: 'طلب غير معروف أو خارج محتوى الدرس المسموح.' };
+                  } catch {
+                    result = { ok: false, message: 'تعذر تنفيذ هذا الإجراء في الصفحة.' };
+                  }
+                  if (attempt !== attemptRef.current || channel.readyState !== 'open') return;
+                  setToolMessage(result.message);
+                  channel.send(JSON.stringify({
+                    type: 'conversation.item.create',
+                    item: { type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) },
+                  }));
+                  processed += 1;
+                }
+                if (processed && attempt === attemptRef.current && channel.readyState === 'open') {
+                  channel.send(JSON.stringify({ type: 'response.create' }));
+                }
+              })();
+            }
+          }
           if (item.type === 'error') setMessage('حدث خلل في المحادثة الصوتية. يمكنك إنهاؤها والمحاولة مجدداً.');
         } catch {
           // Ignore unrelated or future event formats.
@@ -224,6 +269,7 @@ export function SchoolVoiceConversation({ snapshot, enabled, onBegin }: Props) {
       </div>
     )}
     {message && <p role="status" className="school-live-voice-message">{message}</p>}
+    {toolMessage && status !== 'idle' && <p role="status" className="school-live-voice-tool-message">{toolMessage}</p>}
     <small>تحدث بحرية، ويمكنك مقاطعة المعلم. تنتهي الجلسة تلقائياً بعد 3 دقائق.</small>
   </div>;
 }
