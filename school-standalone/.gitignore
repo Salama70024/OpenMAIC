@@ -1,0 +1,8 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+public/school/pdf.worker.min.mjs
+public/school/grade-4-science.base64.txt
+.env
+.env.local
