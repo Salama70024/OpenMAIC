@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, GraduationCap,
+  ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, Circle, GraduationCap,
   HelpCircle, Lightbulb, LoaderCircle, Maximize2, Mic, MicOff,
-  PanelRightClose, PanelRightOpen, Play, Send, Sparkles, Volume2, VolumeX, X, ZoomIn, ZoomOut,
+  PanelRightClose, PanelRightOpen, Pencil, Play, RotateCcw, Send, Sparkles, Volume2, VolumeX, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { bookPages, lessonPoints, type LessonPoint } from '@/lib/school/lesson';
@@ -15,6 +15,7 @@ import { StageIllustration } from './StageIllustration';
 import { ButterflySimulation } from './ButterflySimulation';
 import { StageNarrationButton } from './StageNarrationButton';
 import { SchoolVoiceConversation } from './SchoolVoiceConversation';
+import { SchoolAnnotationOverlay, type SchoolAnnotation } from './SchoolAnnotationOverlay';
 import type { SchoolVoiceAction } from '@/lib/school/voice-actions';
 import '@fontsource/noto-sans-arabic/arabic-400.css';
 import '@fontsource/noto-sans-arabic/arabic-700.css';
@@ -79,6 +80,9 @@ export default function SchoolPage() {
   const [voiceFocus, setVoiceFocus] = useState<string | null>(null);
   const [voiceNotice, setVoiceNotice] = useState('');
   const [voiceQuestion, setVoiceQuestion] = useState('');
+  const [drawing, setDrawing] = useState(false);
+  const [annotations, setAnnotations] = useState<SchoolAnnotation[]>([]);
+  const [focusRequest, setFocusRequest] = useState<{ elementId: string; requestId: number } | null>(null);
   const [chat, setChat] = useState<ChatEntry[]>([{
     from: 'assistant',
     text: 'أهلاً يا أبطال! اختاروا إحدى العلامات المضيئة فوق الكتاب، أو اسألوني عن دورة حياة الفراشة والضفدع.',
@@ -88,6 +92,8 @@ export default function SchoolPage() {
   const recognitionRef = useRef<Recognition | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const currentScaleRef = useRef(1);
+  const annotationIdRef = useRef(0);
+  const focusIdRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -186,6 +192,23 @@ export default function SchoolPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [chat]);
 
+  useEffect(() => {
+    if (!focusRequest || readerMode !== 'book' || rendering) return;
+    const target = lessonPoints.find((point) => point.id === focusRequest.elementId && point.page === page);
+    if (!target) return;
+    const frame = window.requestAnimationFrame(() => {
+      const viewer = viewerRef.current;
+      const sheet = viewer?.querySelector<HTMLElement>('.school-page');
+      if (!viewer || !sheet) return;
+      const viewerRect = viewer.getBoundingClientRect();
+      const sheetRect = sheet.getBoundingClientRect();
+      const centerX = sheetRect.left - viewerRect.left + viewer.scrollLeft + canvasSize.width * target.x;
+      const centerY = sheetRect.top - viewerRect.top + viewer.scrollTop + canvasSize.height * target.y;
+      viewer.scrollTo({ left: centerX - viewer.clientWidth / 2, top: centerY - viewer.clientHeight / 2, behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusRequest, page, readerMode, rendering, canvasSize]);
+
   const checkAssistant = useCallback(async () => {
     setAssistantReady('checking');
     try {
@@ -208,6 +231,8 @@ export default function SchoolPage() {
     setActivePoint(null);
     setQuizChoice(null);
     setLoadError('');
+    setFocusRequest(null);
+    setDrawing(false);
   }, [pdf]);
 
   const choosePoint = (point: LessonPoint) => {
@@ -220,8 +245,14 @@ export default function SchoolPage() {
   };
 
   const changeZoom = (factor: number) => {
+    setFocusRequest(null);
     setCustomScale(Math.max(0.3, Math.min(3, currentScaleRef.current * factor)));
     setViewMode('custom');
+  };
+
+  const addPenStroke = (points: { x: number; y: number }[]) => {
+    annotationIdRef.current += 1;
+    setAnnotations((items) => [...items, { id: `pen-${annotationIdRef.current}`, page, kind: 'pen' as const, points }].slice(-80));
   };
 
   const chooseSimulationStage = useCallback((index: number) => {
@@ -273,6 +304,48 @@ export default function SchoolPage() {
       setVoiceQuestion('');
       setQuizChoice(null);
       const message = `انظر إلى «${point.title}» المحددة الآن في صفحة ${point.page}.`;
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'zoom_region') {
+      const point = lessonPoints.find((entry) => entry.id === action.element_id);
+      if (!point) return { ok: false, message: 'هذا الجزء غير موجود في الدرس.' };
+      setPage(point.page);
+      setReaderMode('book');
+      setActivePoint(point);
+      setVoiceFocus(point.id);
+      setMarkersVisible(true);
+      setDrawing(false);
+      setCustomScale(Math.min(2.6, Math.max(1.25, currentScaleRef.current * 1.7)));
+      setViewMode('custom');
+      focusIdRef.current += 1;
+      setFocusRequest({ elementId: point.id, requestId: focusIdRef.current });
+      const message = `تم تكبير «${point.title}» وتوسيطها لشرح تفاصيلها.`;
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'draw_annotation') {
+      const point = lessonPoints.find((entry) => entry.id === action.element_id);
+      if (!point) return { ok: false, message: 'لا توجد علامة رسم معتمدة لهذا العنصر.' };
+      annotationIdRef.current += 1;
+      setAnnotations((items) => [...items, {
+        id: `teacher-${annotationIdRef.current}`, page: point.page, kind: action.shape, elementId: point.id,
+      }].slice(-80));
+      setPage(point.page);
+      setReaderMode('book');
+      setActivePoint(point);
+      setVoiceFocus(null);
+      setMarkersVisible(false);
+      setDrawing(false);
+      setVoiceQuestion('');
+      const shapeName = action.shape === 'circle' ? 'دائرة' : action.shape === 'arrow' ? 'سهماً' : 'خطاً';
+      const message = `رسم المعلّم ${shapeName} باللون الأحمر لتوضيح «${point.title}».`;
+      setVoiceNotice(message);
+      return { ok: true, message };
+    }
+    if (action.type === 'clear_annotations') {
+      setAnnotations((items) => items.filter((item) => item.page !== page));
+      const message = 'مُسحت علامات الرسم من الصفحة الحالية، وبقي الكتاب كما هو.';
       setVoiceNotice(message);
       return { ok: true, message };
     }
@@ -436,14 +509,17 @@ export default function SchoolPage() {
               <button type="button" onClick={() => changeZoom(0.8)} title="تصغير الصفحة" aria-label="تصغير الصفحة"><ZoomOut size={16} /></button>
               <span className="school-zoom-label" dir="ltr">{zoomPercent}%</span>
               <button type="button" onClick={() => changeZoom(1.25)} title="تكبير الصفحة" aria-label="تكبير الصفحة"><ZoomIn size={16} /></button>
-              <button type="button" onClick={() => setViewMode('page')} className={viewMode === 'page' ? 'school-control-on' : ''} title="إظهار الصفحة كاملة">الصفحة كاملة</button>
-              <button type="button" onClick={() => setViewMode('width')} className={viewMode === 'width' ? 'school-control-on' : ''} title="ملاءمة الصفحة لعرض القارئ">ملاءمة العرض</button>
+              <button type="button" onClick={() => { setFocusRequest(null); setViewMode('page'); }} className={viewMode === 'page' ? 'school-control-on' : ''} title="إظهار الصفحة كاملة">الصفحة كاملة</button>
+              <button type="button" onClick={() => { setFocusRequest(null); setViewMode('width'); }} className={viewMode === 'width' ? 'school-control-on' : ''} title="ملاءمة الصفحة لعرض القارئ">ملاءمة العرض</button>
+              <button type="button" onClick={() => setDrawing((value) => !value)} className={drawing ? 'school-control-on school-pen-active' : ''} aria-pressed={drawing} title={drawing ? 'إنهاء الرسم بالقلم' : 'ارسم على نسخة العرض دون تعديل الكتاب'}><Pencil size={16} /> {drawing ? 'إنهاء القلم' : 'قلم الشرح'}</button>
+              <button type="button" onClick={() => setAnnotations((items) => items.filter((item) => item.page !== page))} disabled={!annotations.some((item) => item.page === page)} title="مسح علامات الرسم من هذه الصفحة" aria-label="مسح الرسم"><RotateCcw size={16} /> مسح الرسم</button>
               <button type="button" onClick={() => setReaderExpanded((value) => !value)} title={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'} aria-label={readerExpanded ? 'العودة إلى عرض الدرس' : 'تكبير عرض الكتاب'}><Maximize2 size={16} /></button>
             </div>}
           </div>
           {readerMode === 'book' ? <><div className={`school-reader-scroll ${viewMode === 'page' ? 'school-fit-page' : ''}`} ref={viewerRef}>
             <div className="school-page" style={{ width: canvasSize.width, height: canvasSize.height }}>
               <canvas ref={canvasRef} aria-label={`صفحة ${page} من كتاب العلوم للصف الرابع الابتدائي`} />
+              <SchoolAnnotationOverlay page={page} drawing={drawing} annotations={annotations} onDraw={addPenStroke} />
               {(rendering || !pdf) && !loadError && <div className="school-pdf-loading"><LoaderCircle size={30} className="school-spinner" /><span>جارٍ فتح صفحة الكتاب…</span></div>}
               {loadError && <div className="school-pdf-loading school-pdf-error"><HelpCircle size={27} /><span>{loadError}</span></div>}
               {markersVisible && !rendering && hotspots.map((point) => (
@@ -492,6 +568,14 @@ export default function SchoolPage() {
               <p className="school-stage-description">{stageContent.explanation}</p>
               <div className="school-guided-observe"><Lightbulb size={17} /><p><strong>لاحظ في الكتاب:</strong> {stageContent.lookFor}</p></div>
               {quizContent}
+              <div className="school-guided-teaching-tools" aria-label="أدوات شرح العنصر الحالي">
+                <strong><Pencil size={15} /> جرّب أدوات الشرح على الرسم</strong>
+                <div>
+                  <button type="button" onClick={() => executeVoiceAction({ type: 'zoom_region', element_id: pointForLesson.id })}><ZoomIn size={15} /> تكبير المرحلة</button>
+                  <button type="button" onClick={() => executeVoiceAction({ type: 'draw_annotation', element_id: pointForLesson.id, shape: 'circle' })}><Circle size={15} /> ضع دائرة</button>
+                </div>
+                <small>يستطيع المعلّم الذكي استخدام الأدوات نفسها أثناء المحادثة الصوتية.</small>
+              </div>
               <div className="school-learning-actions">
               <StageNarrationButton key={pointForLesson.id} audioId={pointForLesson.id}>استمع للشرح</StageNarrationButton>
                 <button type="button" className="school-ask-voice" disabled={assistantReady !== 'ready'} title={assistantReady === 'ready' ? 'اسأل بصوتك' : 'المساعد غير متصل بعد'} onClick={() => { setSideTab('assistant'); startListening(); }}><Mic size={16} /> اسأل بصوتك</button>

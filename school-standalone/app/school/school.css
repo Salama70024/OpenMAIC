@@ -55,11 +55,15 @@
 .school-reader-subtitle { background:#eafaef; color:#249958; padding:4px 9px; border-radius:30px; font-size:10px; }
 .school-reader-controls button,.school-reader-controls a { display:flex; align-items:center; gap:6px; border:1px solid #e2e7f2; background:#fff; color:#6c7691; padding:8px 9px; border-radius:9px; font-size:11px; text-decoration:none; }
 .school-reader-controls .school-control-on { color:#5055c9; background:#f0efff; border-color:#d7d5ff; }
+.school-reader-controls .school-pen-active { color:#b63240; background:#fff0f0; border-color:#f2b6bc; }
+.school-reader-controls button:disabled { cursor:not-allowed; opacity:.45; }
 .school-zoom-label { color:#4e5875; font:700 11px system-ui; min-width:42px; text-align:center; }
 .school-reader-scroll { background: #e5e9f1; display:flex; justify-content:safe center; align-items:flex-start; min-width:0; padding:20px 12px; height:min(72vh,900px); overflow:auto; }
 .school-reader-scroll.school-fit-page { align-items:center; }
 .school-page { background:white; position:relative; flex-shrink:0; box-shadow:0 5px 24px #29365130; }
 .school-page canvas { display:block; }
+.school-annotation-layer { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; overflow:visible; }
+.school-annotation-layer.drawing { z-index:6; pointer-events:auto; cursor:crosshair; touch-action:none; }
 .school-pdf-loading { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:#fffefaed; color:#56688a; font-size:13px; }
 .school-pdf-error { padding:20px; color:#b4524b; text-align:center; }
 .school-spinner { animation:school-spin 1s linear infinite; }
@@ -123,6 +127,12 @@
 .school-quiz-feedback { border-radius:8px; padding:10px; line-height:1.8; font-size:11px; margin-top:9px; }
 .school-quiz-feedback.correct { color:#25794b; background:#e9faed; }
 .school-quiz-feedback.retry { color:#986027; background:#fff4dd; }
+.school-guided-teaching-tools { margin-top:14px; padding:12px; border:1px solid #dce2ff; background:#f7f8ff; border-radius:11px; }
+.school-guided-teaching-tools > strong { display:flex; align-items:center; gap:6px; font-size:11px; color:#4545a7; }
+.school-guided-teaching-tools > div { display:flex; gap:7px; margin:9px 0 6px; }
+.school-guided-teaching-tools button { flex:1; display:flex; justify-content:center; align-items:center; gap:5px; padding:8px 6px; border-radius:8px; border:1px solid #d9d8fb; background:white; color:#4b50ad; font-size:10px; font-weight:700; }
+.school-guided-teaching-tools button:hover { background:#eeefff; }
+.school-guided-teaching-tools small { display:block; color:#7b86a8; font-size:10px; line-height:1.75; }
 .school-read-aloud { display:flex; align-items:center; gap:7px; padding:10px 12px; background:#eceeff; color:#4c50bc; border:1px solid #d2d7ff; border-radius:9px; font-size:11px; margin-top:12px; }
 .school-guided-prompt { display:flex; gap:10px; align-items:flex-start; background:#f1f5ff; padding:13px; border-radius:11px; color:#6877a1; }
 .school-guided-prompt svg { flex-shrink:0; }
